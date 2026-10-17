@@ -32,6 +32,8 @@ GRIDS = {
     "review": [("balanced", v, s) for v in ("cpsat", "cpsat_floor_x0.5", "cpsat_floor_x1.5", "cpsat_floor_human", "cpsat_floor_av", "cpsat_noav") for s in range(5)],
     # issue #2 minor 2: floor sweep + no-AV control extended to the same 10 seeds as `main`
     "review10": [("balanced", v, s) for v in ("cpsat_floor_x0.5", "cpsat_floor_x1.5", "cpsat_floor_human", "cpsat_floor_av", "cpsat_noav") for s in range(5, 10)],
+    # PR #3 review: 24 h AV window at 10 seeds for the paired 24 h - 16 h comparison
+    "hours24_10": [("balanced@av_hours=(0,24)", "cpsat", s) for s in range(5, 10)],
     # step 4 sensitivity sweeps (balanced, seeds 0-4, common random numbers); ';'-separated overrides, demand scales volume
     "sweeps": [(f"balanced@{o}", v, s) for o in
                [f"av_fleet={n}" for n in (0, 1, 3, 4, 6)] + ["av_hours=(0,24)", "av_hours=(6,18)"] +
