@@ -43,10 +43,10 @@ def pallets(ships): return sum(s.pallets for s in ships)
 class HumanOnly:
     """Full trailers go immediately; scheduled sweeps carry everything; at-risk freight triggers an extra run."""
     name = "human_only"
-    def __init__(self, sweep_hours=(22, 2)): self.sweep_hours = sweep_hours; self._last_sweep = {}
+    def __init__(self, sweep_hours=None): self.sweep_hours = sweep_hours; self._last_sweep = {}   # None -> cfg.human_sweep_hours
     def is_sweep(self, tw, now, term):
-        h = int(local_hour(now)); key = (term, int(now // HOUR))
-        if h in self.sweep_hours and local_hour(now) % 1 < tw.cfg.tick_min / 60 and key not in self._last_sweep:
+        h = int(local_hour(now)); key = (term, int(now // HOUR)); hours = self.sweep_hours if self.sweep_hours is not None else tw.cfg.human_sweep_hours
+        if h in hours and local_hour(now) % 1 < tw.cfg.tick_min / 60 and key not in self._last_sweep:
             self._last_sweep[key] = True; return True
         return False
     def human_rules(self, tw, now, term, pool, keep_for_av=0):
@@ -78,7 +78,7 @@ class AVFixed(HumanOnly):
         out = []; a, b = tw.cfg.av_hours
         for term in tw.cfg.terminals:
             pool = list(tw.pool[term]); h = local_hour(now)
-            slot = (a <= h < b) and ((h - a) % self.headway) < tw.cfg.tick_min / 60
+            slot = tw.cfg.av_window_open(h) and (((h - a) % 24) % self.headway) < tw.cfg.tick_min / 60
             if slot and not tw.av_blocked(now):
                 for av in tw.idle_avs(term):
                     stop, load = build_load(tw, pool, "av")

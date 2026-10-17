@@ -20,7 +20,7 @@ class Config:
     load_min_per_pallet: float = 2.5
     trailer_pallets: int = 26               # 53' dry van, single-stacked
     av_fleet: int = 2                       # AV tractors dedicated to the lane, split across terminals
-    av_hours: tuple = (5, 21)               # AV may *depart* only within [start, end) local hours (assumption)
+    av_hours: tuple = (5, 21)               # AVs may be *dispatched* (start loading) only within [start, end) local hours (assumption); start > end wraps midnight, e.g. (21, 5)
     av_direct_to_endpoint: bool = True      # AV may deliver straight to a 3P endpoint (as in the Oct 2026 release)
     human_driver_hours: float = 11.0        # US HOS drive limit; one-way lane fits easily
     # --- costs (USD, assumptions) ---------------------------------------------
@@ -46,6 +46,29 @@ class Config:
     # --- dispatcher -------------------------------------------------------------
     tick_min: int = 15                      # decision epoch
     human_sweep_hours: tuple = (22, 2)      # fixed human linehaul departures (local hour) used by baselines
+
+    def __post_init__(self): self.validate()
+
+    def validate(self):
+        """Reject configs that would otherwise run silently and produce meaningless KPIs. Raises ValueError."""
+        def need(ok, msg):
+            if not ok: raise ValueError(f"invalid Config: {msg}")
+        a, b = self.av_hours
+        need(0 <= a <= 24 and 0 <= b <= 24 and a != b, f"av_hours={self.av_hours}: need 0 <= start, end <= 24 and start != end (start > end wraps midnight)")
+        lo, hi = self.pallets_per_shipment
+        need(self.trailer_pallets >= 1, f"trailer_pallets={self.trailer_pallets} must be >= 1")
+        need(1 <= lo <= hi <= self.trailer_pallets, f"pallets_per_shipment={self.pallets_per_shipment}: need 1 <= lo <= hi <= trailer_pallets={self.trailer_pallets} (shipments are not split)")
+        need(self.av_fleet >= 0, f"av_fleet={self.av_fleet} must be >= 0")
+        need(self.tick_min > 0, f"tick_min={self.tick_min} must be > 0")
+        need(self.human_mph > 0 and self.av_mph > 0, "speeds must be > 0")
+        need(self.doors >= 1, f"doors={self.doors} must be >= 1")
+        need(0 <= self.sla_hours[0] <= self.sla_hours[1], f"sla_hours={self.sla_hours}: need 0 <= lo <= hi")
+        need(all(n >= 0 for n in self.shipments_per_day.values()), "shipments_per_day must be >= 0")
+        need(self.days > self.warmup_days >= 0, "need days > warmup_days >= 0")
+
+    def av_window_open(self, hour: float) -> bool:
+        a, b = self.av_hours
+        return a <= hour < b if a < b else (hour >= a or hour < b)
 
     def transit_min(self, av: bool, to_endpoint: bool) -> float:
         miles = self.lane_miles + (self.endpoint_extra_miles if to_endpoint else 0.0)

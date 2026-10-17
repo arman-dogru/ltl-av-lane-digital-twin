@@ -5,7 +5,8 @@ from .config import DAY, HOUR
 def kpis(tw) -> dict:
     cfg = tw.cfg; S = [s for s in tw.shipments if cfg.warmup_days * DAY <= s.ready < cfg.days * DAY]
     done = [s for s in S if not math.isnan(s.delivered)]
-    on_time = sum(s.delivered <= s.due for s in done) / len(S)
+    nan = math.nan   # zero-demand guard (issue #2): ratios over empty sets are NaN, counts are 0
+    on_time = sum(s.delivered <= s.due for s in done) / len(S) if S else nan
     late_h = [max(0.0, (s.delivered - s.due) / HOUR) for s in done]
     dwell = np.array([(s.departed - s.in_pool) / HOUR for s in done])
     T = [t for t in tw.trips if cfg.warmup_days * DAY <= t.depart < cfg.days * DAY]
@@ -16,16 +17,16 @@ def kpis(tw) -> dict:
     n_late = len(S) - sum(s.delivered <= s.due for s in done)
     pal = sum(s.pallets for s in tw.shipments)
     return dict(shipments=len(S), on_time=on_time, undelivered=len(S) - len(done), mean_late_h=float(np.mean(late_h)) if late_h else 0.0,
-                dwell_mean_h=float(dwell.mean()), dwell_p90_h=float(np.percentile(dwell, 90)),
+                dwell_mean_h=float(dwell.mean()) if len(dwell) else nan, dwell_p90_h=float(np.percentile(dwell, 90)) if len(dwell) else nan,
                 fill_av=fill("av"), fill_human=fill("human"), av_trips=sum(t.vehicle == "av" and not t.empty for t in T),
                 av_empty_trips=sum(t.vehicle == "av" and t.empty for t in T), human_trips=sum(t.vehicle == "human" for t in T),
-                av_share_pallets=sum(s.pallets for s in done if s.mode == "av") / max(1, sum(s.pallets for s in done)),
+                av_share_pallets=sum(s.pallets for s in done if s.mode == "av") / sum(s.pallets for s in done) if done else nan,
                 direct_share=sum(s.direct for s in done if s.to_endpoint) / max(1, sum(s.to_endpoint for s in done)),
-                av_util=av_util, cost_per_pallet=cost / pal, cost_incl_late_per_pallet=(cost + n_late * cfg.late_penalty_per_shipment) / pal)
+                av_util=av_util, cost_per_pallet=cost / pal if pal else nan, cost_incl_late_per_pallet=(cost + n_late * cfg.late_penalty_per_shipment) / pal if pal else nan)
 
 def window_kpis(tw, t0: float, t1: float) -> dict:
     """On-time / lateness for shipments whose original pickup time (`created`, before any slip) is in [t0, t1)."""
     S = [s for s in tw.shipments if t0 <= s.created < t1]
     late = [s for s in S if math.isnan(s.delivered) or s.delivered > s.due]
     lh = [max(0.0, (s.delivered - s.due) / HOUR) for s in S if not math.isnan(s.delivered)]
-    return dict(n=len(S), on_time=1 - len(late) / max(1, len(S)), late_hours_total=float(np.sum(lh)))
+    return dict(n=len(S), on_time=1 - len(late) / len(S) if S else math.nan, late_hours_total=float(np.sum(lh)))

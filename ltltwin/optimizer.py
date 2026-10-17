@@ -31,6 +31,9 @@ class CPSATDispatcher:
         """Per-pallet price of the linehaul a deferred shipment will still need.
         marginal (default): capacity-weighted blend of AV and human full-trailer rates, where av_share is the AV
         capacity actually available in this horizon divided by the pallets waiting (0 if no AV slot -> human rate).
+        Known limitation (issue #2, minor 1): that AV capacity is *inside* the planning window, where in-window AV
+        slots can already use it, so it is partly double-counted as a deferral outlet. The floor is a heuristic
+        lower bound, not an exact continuation value; the floor sweep in the README bounds its effect on results.
         human / av: fixed floors used in the sensitivity sweep. defer_scale multiplies the result."""
         cfg = tw.cfg; P = cfg.trailer_pallets
         av = cfg.lane_miles * cfg.av_cost_per_mile / P; hu = (cfg.lane_miles * cfg.human_cost_per_mile + cfg.human_dispatch_fixed) / P
