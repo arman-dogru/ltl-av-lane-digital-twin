@@ -1,6 +1,6 @@
 # Dallas–Houston autonomous LTL lane digital twin
 
-**Status: in progress.** The simulator, the calibrated scenarios, the baselines, the CP-SAT dispatcher with ablations and controls, and the disruption study are done. Sensitivity sweeps (AV fleet and hours, AV cost, demand) and the final polish come next.
+**Status: in progress.** The simulator, the calibrated scenarios, the baselines, the CP-SAT dispatcher with ablations and controls, and the disruption study are done. Sensitivity sweeps, the seed-stability check and the assumptions table are done (PR #3).
 
 This is a SimPy discrete-event model of an LTL network around one autonomous linehaul lane (Dallas ↔ Houston terminals plus 3P endpoints). It is used to compare policies for deciding which consolidated freight rides an AV truck and which rides a human-driven one. All parameters are explicit assumptions in `ltltwin/config.py`, not Waabi, Volvo or Warp figures. The context is the [Volvo × Waabi customer operations with Warp on Dallas–Houston](https://waabi.ai/insights/volvo-and-waabi-kick-off-customer-operations-in-texas-starting-with-warp) (Oct 5, 2026).
 
@@ -127,6 +127,43 @@ What this means:
 - **Planning horizon:** looking ahead matters most for AV use. Horizon 0 drops the AV share to 0.15 and costs about $0.75 per pallet more than 8–12 h.
 - **Inert features:** direct-to-3P delivery and empty repositioning never trigger under CP-SAT in this setting, because consolidated mixed trailers are never single-endpoint loads. They matter only for the greedy baseline.
 - **Solver health:** 13,505 default solves; 0.4% hit the 1.0 s limit; 0 fallbacks. Warm-starting cuts that to 0.1% without changing KPIs, so it's left off by default.
+
+## Sensitivity sweeps (`experiments/summarize_sweeps.py` → `results/sweeps.md`; balanced, 5 seeds, paired vs human_only under the same setting)
+| Setting | greedy Δ cost/pallet $ | greedy Δ on-time pp | **cpsat Δ cost/pallet $** | cpsat Δ on-time pp | cpsat AV pallet share |
+|---|---|---|---|---|---|
+| AV fleet 0 | 0.00 | 0.00 | −1.07 ± 0.36 | +0.63 ± 0.48 | 0 |
+| AV fleet 1 | −1.80 ± 0.33 | −0.91 ± 0.58 | −4.94 ± 0.61 | −0.88 ± 0.26 | 0.11 |
+| **AV fleet 2 (default)** | −3.00 ± 0.76 | −0.91 ± 0.53 | −8.88 ± 0.73 | −2.38 ± 0.43 | 0.22 |
+| AV fleet 3 | −3.59 ± 0.66 | −0.69 ± 0.47 | −10.11 ± 0.64 | −2.67 ± 0.58 | 0.33 |
+| AV fleet 4 | −4.05 ± 0.66 | −0.51 ± 0.43 | −11.23 ± 0.64 | −3.23 ± 0.85 | 0.43 |
+| AV fleet 6 | −4.84 ± 0.44 | −0.01 ± 0.31 | −12.85 ± 0.93 | −3.02 ± 0.27 | 0.59 |
+| AV hours 06–18 (12 h) | −2.55 ± 0.39 | −1.00 ± 0.25 | −5.45 ± 1.10 | +0.04 ± 0.35 | 0.14 |
+| AV hours 24 h | −3.17 ± 0.14 | −0.96 ± 0.27 | −7.71 ± 1.11 | −1.36 ± 0.76 | 0.25 |
+| AV $1.20/mi | −3.76 ± 0.78 | −0.91 ± 0.53 | −9.87 ± 0.66 | −2.83 ± 0.37 | 0.22 |
+| AV $2.00/mi | −2.23 ± 0.75 | −0.91 ± 0.53 | −7.95 ± 0.61 | −1.90 ± 0.44 | 0.22 |
+| AV $2.30/mi (= human per-mile) | −1.66 ± 0.74 | −0.91 ± 0.53 | −7.25 ± 0.59 | −1.90 ± 0.63 | 0.22 |
+| demand −30% | −3.33 ± 0.52 | −0.46 ± 0.64 | −10.99 ± 1.44 | −1.52 ± 0.42 | 0.29 |
+| demand +30% | −3.03 ± 0.33 | −0.73 ± 0.40 | −7.70 ± 0.61 | −3.96 ± 0.59 | 0.17 |
+
+### What more AV capacity buys
+- **Each extra AV saves less than the one before.** Under CP-SAT, savings vs human-only are $4.9 per pallet at 1 AV, $8.9 at 2, $10.1 at 3, $11.2 at 4 and $12.9 at 6. The 1st and 2nd AVs are worth about $4–5 per pallet each; the 3rd–6th about $1–1.6 each. On roughly 700 pallets/day, the 2nd AV is worth about $2.8k/day and the 4th about $0.8k/day under these assumptions.
+- **Service trade:** with CP-SAT, more AVs cost more on-time (−0.9 pp at 1 AV to about −3 pp at 4–6), because the solver holds more freight for AV slots. Greedy AV-first loses less service as the fleet grows (−0.9 pp → 0.0 pp at 6), but saves only about 40% as much.
+- **AV cost per mile:** this matters less than expected. Even at per-mile parity with human trucks ($2.30), CP-SAT still saves $7.25 per pallet. That's because the AV carries no per-dispatch fixed fee here ($150 per human dispatch) and gives the solver a consolidation outlet. **Model limitation:** there is no fixed per-trip AV cost (remote ops, inspections). Adding one is the most important open sensitivity.
+- **Operating hours:** a 12 h window (06–18) shrinks the saving to $5.45 but costs *no* service (+0.04 ± 0.35 pp). Counterintuitively, 24 h operation saves *less* than the default 16 h window (−$7.71 ± 1.11 vs −$8.88 ± 0.73, with overlapping CIs). That's unexplained so far. A plausible cause is that night AV slots tempt the optimizer to hold freight past the human sweeps, but this isn't verified. It needs more seeds and a trace-level look.
+- **Demand:** the relative saving is biggest when volume is low (−30%: −$11.0, because human trucks would run emptiest) and smallest at +30% (−$7.7). At +30%, CP-SAT's service cost grows to −4.0 pp. The fixed AV fleet saturates, so the AV pallet share falls to 0.17.
+- **These sweeps use 5 seeds.** The seed-stability check below suggests 5-seed paired estimates are usually within about 0.3 $/pallet of the 10–30-seed values, but the CIs are 2–3× wider.
+
+## Seed stability (`experiments/seed_stability.py` → `results/seed_stability.md`, `results/seed_stability.png`)
+| Paired estimate vs human_only | Seeds | Final | At 5 seeds | At 10 seeds | Running mean stays inside final CI from n = |
+|---|---|---|---|---|---|
+| greedy Δ cost/pallet, balanced | 30 | −3.24 ± 0.12 | −3.00 ± 0.76 | −3.12 ± 0.33 | 10 |
+| greedy Δ cost/pallet, imbalanced | 30 | −2.58 ± 0.13 | −2.59 ± 0.73 | −2.70 ± 0.33 | 13 |
+| greedy Δ on-time pp, balanced | 30 | −0.68 ± 0.13 | −0.91 ± 0.53 | −0.82 ± 0.26 | 11 |
+| greedy Δ on-time pp, imbalanced | 30 | −0.39 ± 0.15 | −0.45 ± 0.44 | −0.37 ± 0.29 | 4 |
+| cpsat Δ cost/pallet, balanced | 10 | −8.81 ± 0.30 | −8.88 ± 0.73 | — | (only 10 seeds) |
+| cpsat Δ on-time pp, imbalanced | 10 | −3.69 ± 0.40 | −3.48 ± 0.77 | — | (only 10 seeds) |
+
+All 5-seed estimates fall inside the corresponding final CI, and 10–13 seeds suffice for the running mean to settle within the 30-seed CI. Signs and rankings never change after n = 3. CP-SAT has only 10 seeds; its 5-seed values are within its own 10-seed CIs, but convergence beyond 10 is unverified.
 
 ## Disruption case study (`experiments/disruptions.py`; balanced, 8 seeds, paired vs the same seed undisturbed)
 Day-7 events:
