@@ -23,5 +23,28 @@ for sc in ("balanced", "imbalanced"):
         if len(idx) < 2: continue
         out.append(f"| {p} | {len(idx)} | {ci(100 * (g.loc[idx, 'on_time'] - base.loc[idx, 'on_time']), 2)} | {ci(g.loc[idx, 'cost_per_pallet'] - base.loc[idx, 'cost_per_pallet'], 2)} | {ci(g.loc[idx, 'dwell_mean_h'] - base.loc[idx, 'dwell_mean_h'], 2)} |")
 s = df[df.policy.str.startswith("cpsat")]
-if len(s): out += ["\nSolver health (CP-SAT): " + ", ".join(f"{p}: {int(g.solves.sum())} solves, {int(g.solver_fallbacks.sum())} fallbacks, {int(g.solver_nonoptimal.sum())} time-limited" for p, g in s.groupby("policy"))]
+if len(s):
+    out += ["\n### CP-SAT solver health\n", "| variant | runs | solves | time-limited (feasible, not proven optimal) | fallbacks to greedy |", "|---|---|---|---|---|"]
+    for p, g in s.groupby("policy"):
+        n = int(g.solves.sum()); out.append(f"| {p} | {len(g)} | {n} | {g.solver_nonoptimal.sum() / n:.1%} | {g.solver_fallbacks.sum() / n:.2%} |")
+# vs greedy (the strongest heuristic) for CP-SAT variants
+for sc in ("balanced", "imbalanced"):
+    d = df[df.scenario == sc]; base = d[d.policy == "greedy_av_first"].set_index("seed"); ps = [p for p in sorted(set(d.policy)) if p.startswith("cpsat")]
+    if not ps or base.empty: continue
+    out += [f"\nPaired difference vs greedy_av_first ({sc})\n", "| policy | seeds | Δ on-time (pp) | Δ cost/pallet $ | Δ dwell h |", "|---|---|---|---|---|"]
+    for p in ps:
+        g = d[d.policy == p].set_index("seed"); idx = g.index.intersection(base.index)
+        if len(idx) >= 2: out.append(f"| {p} | {len(idx)} | {ci(100 * (g.loc[idx, 'on_time'] - base.loc[idx, 'on_time']), 2)} | {ci(g.loc[idx, 'cost_per_pallet'] - base.loc[idx, 'cost_per_pallet'], 2)} | {ci(g.loc[idx, 'dwell_mean_h'] - base.loc[idx, 'dwell_mean_h'], 2)} |")
+# disruption case study
+import os
+if os.path.exists("results/disruptions.csv"):
+    z = pd.read_csv("results/disruptions.csv")
+    out += ["\n## Disruption case study (balanced, day-7 events; freight created days 7-8; paired vs same seed undisturbed)\n",
+            "| case | policy | seeds | window on-time | Δ vs undisturbed (pp) | peak excess backlog (pallets) | excess pallet-hours |", "|---|---|---|---|---|---|---|"]
+    for c in ["none", "weather", "dock", "surge", "combined"]:
+        for p in ["human_only", "greedy_av_first", "cpsat"]:
+            g = z[(z.case == c) & (z.policy == p)].set_index("seed"); b = z[(z.case == "none") & (z.policy == p)].set_index("seed")
+            if g.empty: continue
+            idx = g.index.intersection(b.index)
+            out.append(f"| {c} | {p} | {len(g)} | {ci(g.win_on_time, 3)} | {ci(100 * (g.loc[idx, 'win_on_time'] - b.loc[idx, 'win_on_time']), 2) if c != 'none' else '—'} | {ci(g.peak_excess_pallets, 0) if c != 'none' else '—'} | {ci(g.excess_pallet_hours, 0) if c != 'none' else '—'} |")
 open("results/summary.md", "w").write("\n".join(out) + "\n"); print("\n".join(out))

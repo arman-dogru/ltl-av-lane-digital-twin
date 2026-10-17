@@ -33,13 +33,21 @@ def run(cell):
     return dict(case=case, policy=pol, seed=seed, win_on_time=w["on_time"], win_late_hours=w["late_hours_total"], win_n=w["n"],
                 on_time=k["on_time"], cost_per_pallet=k["cost_per_pallet"]), tr
 
+CACHE = "results/disruptions_cells.jsonl"   # one line per finished cell -> resumable
+
 if __name__ == "__main__":
     os.makedirs("results", exist_ok=True); cells = [(c, p, s) for c in CASES for p in POL for s in SEEDS]
     rows, traces = [], {}
+    if os.path.exists(CACHE):
+        for line in open(CACHE):
+            d = json.loads(line); rows.append(d["row"]); traces[(d["row"]["case"], d["row"]["policy"], d["row"]["seed"])] = d["trace"]
+    todo = [c for c in cells if c not in traces]; print(f"{len(todo)} cells to run ({len(traces)} cached)", flush=True)
     with ProcessPoolExecutor(int(sys.argv[1]) if len(sys.argv) > 1 else 3) as ex:
-        for f in as_completed([ex.submit(run, c) for c in cells]):
-            r, tr = f.result(); rows.append(r); traces[(r["case"], r["policy"], r["seed"])] = tr; print(r["case"], r["policy"], r["seed"], round(r["win_on_time"], 3), flush=True)
-    # excess backlog vs same-seed undisturbed run (tick = cfg.tick_min minutes)
+        for f in as_completed([ex.submit(run, c) for c in todo]):
+            r, tr = f.result(); rows.append(r); traces[(r["case"], r["policy"], r["seed"])] = tr
+            with open(CACHE, "a") as fh: fh.write(json.dumps(dict(row=r, trace=tr)) + "\n")
+            print(r["case"], r["policy"], r["seed"], round(r["win_on_time"], 3), flush=True)
+    # excess backlog vs same-seed undisturbed run (trace sampled every cfg.tick_min = 15 min)
     for r in rows:
         base = np.array([b for _, b in traces[("none", r["policy"], r["seed"])]], float); cur = np.array([b for _, b in traces[(r["case"], r["policy"], r["seed"])]], float)
         n = min(len(base), len(cur)); ex_ = np.clip(cur[:n] - base[:n], 0, None)
@@ -47,9 +55,8 @@ if __name__ == "__main__":
     rows.sort(key=lambda r: (r["case"], r["policy"], r["seed"]))
     with open("results/disruptions.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
-    # mean backlog trace per case/policy for plotting
     mt = {}
     for (c, p, s), tr in traces.items(): mt.setdefault(f"{c}|{p}", []).append([b for _, b in tr])
-    json.dump({k: dict(t_hours=[(t - D) / HOUR for t, _ in traces[(k.split('|')[0], k.split('|')[1], 0)]], backlog=np.mean([v[:min(map(len, vs))] for v in vs], axis=0).tolist())
+    json.dump({k: dict(t_hours=[(t - D) / HOUR for t, _ in traces[(k.split("|")[0], k.split("|")[1], 0)]], backlog=np.mean([v[:min(map(len, vs))] for v in vs], axis=0).tolist())
                for k, vs in mt.items()}, open("results/disruption_traces.json", "w"))
     print("DONE")
