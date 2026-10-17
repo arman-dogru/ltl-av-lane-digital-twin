@@ -4,7 +4,7 @@ import glob, numpy as np, pandas as pd
 from scipy import stats
 df = pd.concat([pd.read_csv(f) for f in glob.glob("results/grid_*.csv")]).drop_duplicates(["scenario", "policy", "seed"])
 base = df[(df.scenario == "balanced") & (df.seed < 5) & df.policy.isin(["human_only", "greedy_av_first", "cpsat"])].copy(); base["scenario"] = "balanced@default"
-d = pd.concat([df[df.scenario.str.startswith("balanced@")], base]); d["setting"] = d.scenario.str.split("@").str[1]
+d = pd.concat([df[df.scenario.str.startswith("balanced@") & (df.seed < 5)], base]); d["setting"] = d.scenario.str.split("@").str[1]
 def ci(x, k=2):
     x = np.asarray(x, float); x = x[~np.isnan(x)]
     if len(x) < 2: return "—"
