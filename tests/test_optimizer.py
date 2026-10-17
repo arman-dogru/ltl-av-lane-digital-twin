@@ -29,3 +29,18 @@ def test_urgent_freight_ships_now():
     pool = [Shipment(0, "DAL", "HOU", "HOU", 3, 0, now + 5 * HOUR)]           # must leave now on a human truck
     ds = CPSATDispatcher(time_limit_s=1).plan(tw, now, "DAL", pool)
     assert len(ds) == 1 and ds[0].vehicle == "human"
+
+def test_deferral_is_not_free():
+    """Deferring a shipment must cost at least its share of the cheapest full linehaul (reviewer finding on PR #1)."""
+    cfg = small(); tw = Twin(cfg, lambda *_: [], seed=0); P = CPSATDispatcher()
+    s = Shipment(0, "DAL", "HOU", "HOU", 6, 0, 100 * HOUR)          # far from due: no lateness component
+    floor = 6 * min(cfg.lane_miles * cfg.av_cost_per_mile, cfg.lane_miles * cfg.human_cost_per_mile + cfg.human_dispatch_fixed) / cfg.trailer_pallets
+    assert P.defer_cost(tw, s, 0.0) >= floor > 0
+
+def test_full_trailer_ships_within_horizon_rather_than_deferring():
+    """With a full trailer's worth of non-urgent freight and an idle AV, deferring everything must not be optimal."""
+    cfg = small(); tw = Twin(cfg, lambda *_: [], seed=0); now = 8 * HOUR
+    pool = [Shipment(i, "DAL", "HOU", "HOU", 13, 0, now + 60 * HOUR) for i in range(2)]   # 26 pallets, due in 60 h
+    P = CPSATDispatcher(horizon_h=0, time_limit_s=1)   # only 'now' slots: ship now vs defer
+    ds = P.plan(tw, now, "DAL", pool)
+    assert ds and sum(len(d.shipments) for d in ds) == 2

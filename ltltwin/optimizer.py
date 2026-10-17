@@ -14,7 +14,7 @@ from .policies import eta_delivery, build_load, pallets, GreedyAVFirst
 
 class CPSATDispatcher:
     name = "cpsat"
-    def __init__(self, horizon_h=8, reopt_min=60, slot_h=1, direct=True, wait_cost_per_h=1.0, time_limit_s=0.5, reposition=True, late_fixed=300.0, late_per_h=50.0, buffer_min=30.0):
+    def __init__(self, horizon_h=8, reopt_min=60, slot_h=1, direct=True, wait_cost_per_h=1.0, time_limit_s=1.0, reposition=True, late_fixed=300.0, late_per_h=50.0, buffer_min=30.0):
         self.h, self.reopt, self.slot, self.direct = horizon_h, reopt_min, slot_h, direct
         self.wait_cost, self.tl, self.reposition = wait_cost_per_h, time_limit_s, reposition
         self.late_fixed, self.late_per_h, self.buffer = late_fixed, late_per_h, buffer_min
@@ -24,6 +24,15 @@ class CPSATDispatcher:
         """Service-failure cost: fixed charge once late, plus a per-hour charge (so late freight is never parked indefinitely)."""
         eta = eta + self.buffer   # same safety margin as the baselines' at-risk rule (dock queueing, loading variance)
         return 0.0 if eta <= due else self.late_fixed + self.late_per_h * (eta - due) / HOUR
+
+    def defer_cost(self, tw, s, now):
+        """Deferring past the horizon is not free: the shipment still needs a linehaul later (charged at its pallet
+        share of the cheapest *full* trailer, i.e. a lower bound on future transport cost), plus the lateness it
+        would incur leaving at the horizon end, plus waiting cost up to then."""
+        cfg = tw.cfg; end = now + self.h * HOUR + self.slot * HOUR
+        av_trip = cfg.lane_miles * cfg.av_cost_per_mile; hu_trip = cfg.lane_miles * cfg.human_cost_per_mile + cfg.human_dispatch_fixed
+        per_pallet = (min(av_trip, hu_trip) if cfg.av_fleet > 0 else hu_trip) / cfg.trailer_pallets
+        return s.pallets * per_pallet + self.late_cost(eta_delivery(tw, s, end, "human", False), s.due) + self.wait_cost * (end - now) / HOUR
 
     def _next_allowed(self, tw, t):
         step = tw.cfg.tick_min; n = 0
@@ -53,7 +62,7 @@ class CPSATDispatcher:
         for i, s in enumerate(pool):
             m.AddExactlyOne([x[i, k] for k in range(len(slots))] + [defer[i]])
             end = now + self.h * HOUR + self.slot * HOUR
-            cost.append(defer[i] * int(round(self.late_cost(eta_delivery(tw, s, end, "human", False), s.due) + self.wait_cost * (end - now) / HOUR)))
+            cost.append(defer[i] * int(round(self.defer_cost(tw, s, now))))
             for k, (v, _, t) in enumerate(slots):
                 c = self.late_cost(eta_delivery(tw, s, t, v, False), s.due) + self.wait_cost * (t - now) / HOUR
                 cost.append(x[i, k] * int(round(c)))

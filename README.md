@@ -1,6 +1,6 @@
 # Dallas–Houston autonomous LTL lane digital twin
 
-**Status: in progress (session 2 of several).** The simulator, the calibrated scenarios, the baselines and the CP-SAT dispatcher are done, and the CP-SAT experiments are running. The disruption experiments, the sweeps and the final write-up come next (see `/workspace/projects/progress.md`).
+**Status: in progress (session 2 of several).** The simulator, the calibrated scenarios, the baselines and the CP-SAT dispatcher are done, and the CP-SAT experiments are running. The disruption experiments, the sweeps and the final write-up come next.
 
 This is a SimPy discrete-event model of an LTL network around one autonomous linehaul lane (Dallas ↔ Houston terminals plus 3P endpoints). It is used to compare policies for deciding which consolidated freight rides an AV truck and which rides a human-driven one. All parameters are explicit assumptions in `ltltwin/config.py`, not Waabi, Volvo or Warp figures. The context is the [Volvo × Waabi customer operations with Warp on Dallas–Houston](https://waabi.ai/insights/volvo-and-waabi-kick-off-customer-operations-in-texas-starting-with-warp) (Oct 5, 2026).
 
