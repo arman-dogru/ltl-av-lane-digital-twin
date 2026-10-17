@@ -19,17 +19,21 @@ VARIANTS = {
     "cpsat_reopt30": lambda: CPSATDispatcher(reopt_min=30), "cpsat_reopt120": lambda: CPSATDispatcher(reopt_min=120),
     "cpsat_buf0": lambda: CPSATDispatcher(buffer_min=0), "cpsat_buf90": lambda: CPSATDispatcher(buffer_min=90),
     "cpsat_late150": lambda: CPSATDispatcher(late_fixed=150, late_per_h=25), "cpsat_late1500": lambda: CPSATDispatcher(late_fixed=1500, late_per_h=250),
+    "cpsat_warm": lambda: CPSATDispatcher(warm_start=True), "cpsat_noav": lambda: CPSATDispatcher(),
     "cpsat_nodirect": lambda: CPSATDispatcher(direct=False), "cpsat_norepo": lambda: CPSATDispatcher(reposition=False),
 }
+CFG = {"cpsat_noav": dict(av_fleet=0)}   # per-variant scenario overrides (no-AV control: same dispatcher, no AV trucks)
 BASE = ["human_only", "av_fixed", "greedy_av_first"]
 GRIDS = {
     "baselines": [(sc, v, s) for sc in ("balanced", "imbalanced") for v in BASE for s in range(30)],
     "main": [(sc, "cpsat", s) for sc in ("balanced", "imbalanced") for s in range(10)],
-    "ablations": [("balanced", v, s) for v in VARIANTS if v.startswith("cpsat_") for s in range(8)],
+    # reviewer-requested horizon checks + controls first; 5 seeds (paired with the same seeds of `main`)
+    "ablations": [("balanced", v, s) for v in ("cpsat_myopic", "cpsat_h4", "cpsat_h12", "cpsat_noav", "cpsat_warm", "cpsat_norepo", "cpsat_nodirect") for s in range(5)],
+    "ablations_more": [("balanced", v, s) for v in ("cpsat_buf0", "cpsat_buf90", "cpsat_late150", "cpsat_late1500", "cpsat_reopt30", "cpsat_reopt120") for s in range(5)],
 }
 
 def run(cell):
-    sc, v, seed = cell; t = time.time(); P = VARIANTS[v](); tw = Twin(scenario(sc), P, seed=seed).run()
+    sc, v, seed = cell; t = time.time(); P = VARIANTS[v](); tw = Twin(scenario(sc, **CFG.get(v, {})), P, seed=seed).run()
     k = kpis(tw); st = getattr(P, "stats", {})
     return dict(scenario=sc, policy=v, seed=seed, runtime_s=round(time.time() - t, 1), **k,
                 solves=st.get("solves", 0), solver_fallbacks=st.get("fallback", 0), solver_nonoptimal=st.get("feasible", 0))

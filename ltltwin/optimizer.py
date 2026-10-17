@@ -14,10 +14,11 @@ from .policies import eta_delivery, build_load, pallets, GreedyAVFirst
 
 class CPSATDispatcher:
     name = "cpsat"
-    def __init__(self, horizon_h=8, reopt_min=60, slot_h=1, direct=True, wait_cost_per_h=1.0, time_limit_s=1.0, reposition=True, late_fixed=300.0, late_per_h=50.0, buffer_min=30.0):
+    def __init__(self, horizon_h=8, reopt_min=60, slot_h=1, direct=True, wait_cost_per_h=1.0, time_limit_s=1.0, reposition=True, late_fixed=300.0, late_per_h=50.0, buffer_min=30.0, warm_start=False):
         self.h, self.reopt, self.slot, self.direct = horizon_h, reopt_min, slot_h, direct
         self.wait_cost, self.tl, self.reposition = wait_cost_per_h, time_limit_s, reposition
         self.late_fixed, self.late_per_h, self.buffer = late_fixed, late_per_h, buffer_min
+        self.warm = warm_start; self._prev = {}   # sid -> (vehicle, av_id, slot_time) from the previous epoch's plan
         self._last = -math.inf; self.stats = dict(solves=0, optimal=0, feasible=0, fallback=0)
 
     def late_cost(self, eta, due):
@@ -74,12 +75,22 @@ class CPSATDispatcher:
         for av in tw.avs:
             ks = [k for k, (v, aid, _) in enumerate(slots) if v == "av" and aid == av.aid]
             if ks: m.Add(sum(y[k] for k in ks) <= 1)
+        if self.warm:   # hint: keep last epoch's assignment where that slot still exists, else defer
+            for i, sh in enumerate(pool):
+                prev = self._prev.get(sh.sid); k = next((k for k, sl in enumerate(slots) if prev and sl[0] == prev[0] and sl[1] == prev[1] and abs(sl[2] - prev[2]) < 1e-6), None)
+                for kk in range(len(slots)): m.AddHint(x[i, kk], int(kk == k))
+                m.AddHint(defer[i], int(k is None))
         m.Minimize(sum(cost))
         sol = cp_model.CpSolver(); sol.parameters.max_time_in_seconds = self.tl; sol.parameters.num_workers = 1
         st = sol.Solve(m); self.stats["solves"] += 1
         if st not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             self.stats["fallback"] += 1; return None
         self.stats["optimal" if st == cp_model.OPTIMAL else "feasible"] += 1
+        if self.warm:
+            for i, sh in enumerate(pool):
+                k = next((k for k in range(len(slots)) if sol.Value(x[i, k])), None)
+                if k is None: self._prev.pop(sh.sid, None)
+                else: self._prev[sh.sid] = slots[k]
         out = []
         for k, (v, aid, t) in enumerate(slots):
             if t > now + 1e-6 or not sol.Value(y[k]): continue

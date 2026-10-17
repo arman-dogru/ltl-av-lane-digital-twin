@@ -44,3 +44,11 @@ def test_full_trailer_ships_within_horizon_rather_than_deferring():
     P = CPSATDispatcher(horizon_h=0, time_limit_s=1)   # only 'now' slots: ship now vs defer
     ds = P.plan(tw, now, "DAL", pool)
     assert ds and sum(len(d.shipments) for d in ds) == 2
+
+def test_warm_start_runs_and_conserves():
+    P = CPSATDispatcher(time_limit_s=0.3, warm_start=True); tw = Twin(small(), P, seed=2).run()
+    assert all(not math.isnan(s.delivered) for s in tw.shipments) and P.stats["fallback"] == 0 and len(P._prev) >= 0
+
+def test_noav_control_uses_no_av():
+    tw = Twin(small(av_fleet=0), CPSATDispatcher(time_limit_s=0.3), seed=0).run()
+    assert not any(t.vehicle == "av" for t in tw.trips)
