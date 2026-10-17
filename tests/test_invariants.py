@@ -53,3 +53,16 @@ def test_late_pickup_window_only_affects_window():
     tw = Twin(small(late_pickup_prob=1.0, late_pickup_window=(2 * DAY, 3 * DAY)), HumanOnly(), seed=0).run()
     for s in tw.shipments:
         assert (s.ready > s.created) == (2 * DAY <= s.created < 3 * DAY)
+
+@pytest.mark.parametrize("P", POLICIES)
+def test_zero_demand_does_not_crash(P):
+    """Issue #2: zero demand must yield NaN ratios / zero counts, not a ZeroDivisionError."""
+    from ltltwin.kpi import window_kpis
+    tw = Twin(small(shipments_per_day={"DAL": 0, "HOU": 0}), P(), seed=0).run(); k = kpis(tw)
+    assert k["shipments"] == 0 and k["human_trips"] == 0 and math.isnan(k["on_time"]) and math.isnan(k["cost_per_pallet"])
+    assert math.isnan(window_kpis(tw, 0, DAY)["on_time"])
+
+def test_zero_demand_cpsat():
+    from ltltwin.optimizer import CPSATDispatcher
+    k = kpis(Twin(small(shipments_per_day={"DAL": 0, "HOU": 0}), CPSATDispatcher(time_limit_s=0.2), seed=0).run())
+    assert k["shipments"] == 0 and math.isnan(k["on_time"])

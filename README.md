@@ -91,6 +91,8 @@ Paired differences:
 | no direct-to-3P | −8.89 ± 0.73 | −2.39 ± 0.43 | +2.98 | same as default within noise |
 | no empty repositioning | −8.88 ± 0.73 | −2.38 ± 0.43 | +2.99 | same as default within noise |
 
+Known limitation of the floor (issue #2): `av_share` counts AV capacity *inside* the planning window, which in-window AV slots can already use. So it partly double-counts that capacity as an outlet for deferred freight, and the floor is a heuristic, not an exact continuation value. The sweep above bounds the effect: cost is insensitive to it, dwell is not.
+
 What this means:
 - **The cost result is robust to the objective's defer floor.** Scaling the floor from ×0.5 to the full human rate moves cost by under $0.40 per pallet. What the floor really controls is the dwell vs on-time trade: a cheaper floor gives longer holds and *better* on-time (the solver waits for AV slots), while a pricier floor gives shorter holds.
 - **Dispatching alone isn't the source of the saving; AVs are what make consolidation pay.** The same CP-SAT dispatcher without AVs saves only $1.07 per pallet over human-only, at +0.6 pp on-time. With AVs it saves $8.81, so about 88% of the optimizer's saving depends on AV capacity. With AVs as an outlet for the residual partial loads, human trucks run nearly full (fill 0.98 vs 0.83). The greedy heuristic captures only $3.24 of that value.

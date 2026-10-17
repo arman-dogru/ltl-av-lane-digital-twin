@@ -3,6 +3,7 @@ Only completed cells are reported, with their seed counts."""
 import glob, numpy as np, pandas as pd
 from scipy import stats
 df = pd.concat([pd.read_csv(f) for f in glob.glob("results/grid_*.csv")], ignore_index=True).drop_duplicates(["scenario", "policy", "seed"])
+df = df[~df.scenario.str.contains("@")]   # sensitivity-sweep cells are summarised by experiments/summarize_sweeps.py
 K = [("on_time", "on-time", 3), ("cost_per_pallet", "cost/pallet $", 2), ("cost_incl_late_per_pallet", "cost+late/pallet $", 2), ("dwell_mean_h", "dwell h", 2),
      ("fill_av", "AV fill", 3), ("fill_human", "human fill", 3), ("av_share_pallets", "AV pallet share", 3), ("av_util", "AV util", 3), ("human_trips", "human trips", 0)]
 def ci(x, d):
@@ -47,4 +48,5 @@ if os.path.exists("results/disruptions.csv"):
             if g.empty: continue
             idx = g.index.intersection(b.index)
             out.append(f"| {c} | {p} | {len(g)} | {ci(g.win_on_time, 3)} | {ci(100 * (g.loc[idx, 'win_on_time'] - b.loc[idx, 'win_on_time']), 2) if c != 'none' else '—'} | {ci(g.peak_excess_pallets, 0) if c != 'none' else '—'} | {ci(g.excess_pallet_hours, 0) if c != 'none' else '—'} |")
+out.insert(0, "Source files: grid_baselines.csv (human_only/av_fixed/greedy, seeds 0-29); grid_review.csv (balanced cpsat seeds 0-4 + floor/no-AV variants seeds 0-4); grid_review10.csv (floor/no-AV variants seeds 5-9); grid_main.csv (balanced cpsat seeds 5-9, imbalanced cpsat seeds 0-9); grid_ablations.csv (ablations seeds 0-4). The runner never re-runs a finished cell, so the balanced cpsat seeds are split: 0-4 in grid_review.csv, 5-9 in grid_main.csv.\n")
 open("results/summary.md", "w").write("\n".join(out) + "\n"); print("\n".join(out))
