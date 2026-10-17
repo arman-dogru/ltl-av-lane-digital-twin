@@ -146,11 +146,26 @@ What this means:
 | demand +30% | −3.03 ± 0.33 | −0.73 ± 0.40 | −7.70 ± 0.61 | −3.96 ± 0.59 | 0.17 |
 
 ### What more AV capacity buys
-- **Each extra AV saves less than the one before.** Under CP-SAT, savings vs human-only are $4.9 per pallet at 1 AV, $8.9 at 2, $10.1 at 3, $11.2 at 4 and $12.9 at 6. The 1st and 2nd AVs are worth about $4–5 per pallet each; the 3rd–6th about $1–1.6 each. On roughly 700 pallets/day, the 2nd AV is worth about $2.8k/day and the 4th about $0.8k/day under these assumptions.
-- **Service trade:** with CP-SAT, more AVs cost more on-time (−0.9 pp at 1 AV to about −3 pp at 4–6), because the solver holds more freight for AV slots. Greedy AV-first loses less service as the fleet grows (−0.9 pp → 0.0 pp at 6), but saves only about 40% as much.
+- **Each extra AV saves less than the one before.** Under CP-SAT, savings vs human-only are $4.9 per pallet at 1 AV, $8.9 at 2, $10.1 at 3, $11.2 at 4 and $12.9 at 6. The 1st and 2nd AVs are worth about $4–5 per pallet each; the 3rd and 4th about $1.1–1.2 each, and the 5th and 6th about $0.8 each. On roughly 700 pallets/day, the 2nd AV is worth about $2.8k/day and the 4th about $0.8k/day under these assumptions.
+- **Service trade:** with CP-SAT, more AVs cost more on-time (−0.9 pp at 1 AV to about −3 pp at 4–6), because the solver holds more freight for AV slots. Greedy AV-first loses less service as the fleet grows (−0.9 pp → 0.0 pp at 6), but saves only about a third as much (34–38% of CP-SAT's saving across fleet sizes).
 - **AV cost per mile:** this matters less than expected. Even at per-mile parity with human trucks ($2.30), CP-SAT still saves $7.25 per pallet. That's because the AV carries no per-dispatch fixed fee here ($150 per human dispatch) and gives the solver a consolidation outlet. **Model limitation:** there is no fixed per-trip AV cost (remote ops, inspections). Adding one is the most important open sensitivity.
-- **Operating hours:** a 12 h window (06–18) shrinks the saving to $5.45 but costs *no* service (+0.04 ± 0.35 pp). Counterintuitively, 24 h operation saves *less* than the default 16 h window (−$7.71 ± 1.11 vs −$8.88 ± 0.73, with overlapping CIs). That's unexplained so far. A plausible cause is that night AV slots tempt the optimizer to hold freight past the human sweeps, but this isn't verified. It needs more seeds and a trace-level look.
-- **Demand:** the relative saving is biggest when volume is low (−30%: −$11.0, because human trucks would run emptiest) and smallest at +30% (−$7.7). At +30%, CP-SAT's service cost grows to −4.0 pp. The fixed AV fleet saturates, so the AV pallet share falls to 0.17.
+- **Operating hours:** a 12 h window (06–18) shrinks the saving to $5.45 ± 1.10 but costs no service (+0.04 ± 0.35 pp). **Opening the AVs to 24 h makes CP-SAT *more expensive* than the default 05–21 window.** See "Why a 24 h AV window costs more" below.
+
+### Why a 24 h AV window costs more (`experiments/av_hours_mechanism.py` → `results/av_hours_mechanism.md`)
+Paired on the same seeds (common random numbers), CP-SAT, balanced, 24 h − 16 h:
+
+| Seeds | Δ cost/pallet $ | Δ on-time pp | Δ dwell h | Δ AV trips | Δ human fill |
+|---|---|---|---|---|---|
+| 5 | +1.18 ± 0.71 | +1.02 ± 0.70 | −0.35 ± 0.23 | +10.2 ± 1.0 | −0.071 ± 0.030 |
+| 10 | +0.71 ± 0.48 | +0.56 ± 0.50 | −0.19 ± 0.17 | +10.6 ± 0.6 | −0.053 ± 0.019 |
+
+So 24 h is about $0.7 per pallet worse at 10 seeds; the CI excludes zero. It runs about 10 more AV trips, has slightly *better* service and *lower* dwell, and its human trucks are emptier. (Comparing the two marginal CIs in the sweep table hides this; the paired difference is the right test.)
+
+The trace rerun (seeds 0, 1, 4) shows the mechanism:
+- **The 05–21 window doubles as an AV timetable.** Both AVs sit parked from 02:00 to 05:00 (1.98–2.00 idle of 2). They leave together at 05:00 with the overnight backlog. The window then keeps them in phase with the afternoon and evening peaks: AV departures cluster at 03–09 (78), 12–15 (74) and 18–21 (71), with almost none at 09–12 or 15–18.
+- **With 24 h, AV departures spread evenly**, about 28–37 per 3 h bucket, and AVs are never all parked (0.4–0.7 idle at every hour). The morning backlog then goes onto partly empty human trucks: human fill for 03–12 departures drops from 0.66–0.98 to 0.51–0.78. Human runs with under 20 pallets go from 6–12 per run to 43–53.
+- **Why CP-SAT doesn't find the timetable itself:** the rolling-horizon model allows at most one slot per AV per horizon. It also gives no value to where and when an AV will be after the horizon ends. A free AV is always worth dispatching *now*, so the solver can't see the benefit of holding both AVs for the 05:00 wave. This is a planner limitation, not a simulator bug. It also means CP-SAT is **not optimal with respect to AV timing**, and the fixed window acts as an implicit positioning policy.
+- **Demand:** the absolute saving per pallet is biggest when volume is low (−30%: −$11.0, because human trucks would run emptiest) and smallest at +30% (−$7.7). At +30%, CP-SAT's service cost grows to −4.0 pp. The fixed AV fleet saturates, so the AV pallet share falls to 0.17.
 - **These sweeps use 5 seeds.** The seed-stability check below suggests 5-seed paired estimates are usually within about 0.3 $/pallet of the 10–30-seed values, but the CIs are 2–3× wider.
 
 ## Seed stability (`experiments/seed_stability.py` → `results/seed_stability.md`, `results/seed_stability.png`)
@@ -165,7 +180,7 @@ What this means:
 | cpsat Δ on-time pp, balanced | 10 | −2.25 ± 0.28 | −2.38 ± 0.43 | = final | 3 (of 10) |
 | cpsat Δ on-time pp, imbalanced | 10 | −3.69 ± 0.40 | −3.48 ± 0.77 | = final | 5 (of 10) |
 
-All 5-seed estimates fall inside the corresponding final CI, and 10–13 seeds suffice for the running mean to settle within the 30-seed CI. Every estimate's sign agrees with its final value by n = 5. CP-SAT has only 10 seeds; its 5-seed values are within its own 10-seed CIs, but convergence beyond 10 is unverified.
+Every final mean lies inside its 5-seed CI. The converse fails for two balanced greedy rows: Δ cost −3.00 vs a final −3.24 ± 0.12, and Δ on-time −0.91 vs a final −0.68 ± 0.13 (both columns are computed in `results/seed_stability.md`). 10–13 seeds suffice for the running mean to settle within the 30-seed CI. Every estimate's sign agrees with its final value by n = 5. CP-SAT has only 10 seeds; its 5-seed values are within its own 10-seed CIs, but convergence beyond 10 is unverified.
 
 ## Disruption case study (`experiments/disruptions.py`; balanced, 20 seeds, paired vs the same seed undisturbed)
 Day-7 events:
@@ -195,7 +210,7 @@ Metrics cover freight created on days 7–8. Undisturbed window on-time: human_o
 
 Narrative:
 - **The plot shows each policy's operating style.** CP-SAT runs a large standing backlog every day (peaks of 150–230 pallets vs about 30–50 for human-only). This is the consolidation strategy that drives both its cost advantage and its extra dwell; disruptions are small on top of it.
-- **A 12 h AV weather hold doesn't hurt service.** Human trucks absorb the freight. Under CP-SAT, window on-time even rises, by +1.22 ± 0.41 pp. With 20 seeds the CI clearly excludes zero, where at 8 seeds it was borderline. The frozen AV slots force earlier human departures, i.e. the effect is CP-SAT's normal holding being suspended. The cost is a backlog that peaks at 35–50 pallets.
+- **A 12 h AV weather hold doesn't hurt service.** Human trucks absorb the freight. Under CP-SAT, window on-time even rises, by +1.22 ± 0.41 pp. With 20 seeds the CI clearly excludes zero, where at 8 seeds it was borderline. A likely explanation, not verified at trace level: with AVs frozen, `av_share` = 0, so the defer floor falls to the human rate. CP-SAT then holds less and sends freight on earlier human departures. This is consistent with the floor sweep, where the human-rate floor dwells 0.8 h less than the default (+2.13 vs +2.97 h), but window dwell isn't recorded in the disruption runs. The cost is a backlog that peaks at 35–50 pallets.
 - **A dock outage at the inbound peak is close to free for on-time** for every policy (|Δ| ≤ 0.11 pp), but it adds backlog: 2× human-only's pallet-hours for greedy, about 4.6× for CP-SAT.
 - **The late-pickup surge dominates**, at about 1–2 pp on-time for every policy. With 20 seeds the CIs are about ±1 pp and still overlap, so **no policy is clearly more resilient on service**. The 8-seed estimates (−2 to −3 pp) were biased toward larger losses by a few bad seeds. CP-SAT carries roughly twice human-only's excess backlog (about 1,150 vs 600 pallet-hours), because it was already holding freight to consolidate. A consolidation-heavy optimizer has less slack to absorb surges.
 
@@ -205,6 +220,7 @@ uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt   
 .venv/bin/python -m pytest -q tests                            # 26 tests
 WORKERS=4 ./run_all.sh                                        # resumable grids -> results/grid_*.csv
 ./run_followup.sh                                             # review10 + sweeps grids, 20-seed disruptions (log: results/followup.log)
+.venv/bin/python experiments/av_hours_mechanism.py         # -> results/av_hours_mechanism.md (paired 24h-16h + traces)
 .venv/bin/python experiments/summarize.py                     # -> results/summary.md
 .venv/bin/python experiments/summarize_sweeps.py              # -> results/sweeps.md
 .venv/bin/python experiments/seed_stability.py                # -> results/seed_stability.md/.png
@@ -215,13 +231,13 @@ CP-SAT runs with a 1 s time limit, so reruns can differ in the last digits. The 
 - Every number is synthetic, from `ltltwin/config.py`. The ranking of policies is the result; the dollar levels are not forecasts.
 - AV cost is per-mile only, with no fixed per-trip cost (remote ops, inspections, terminal handoff). This flatters the AV, as shown by the $2.30/mi sweep.
 - The defer floor is a heuristic continuation value (see the `av_share` note above). The dwell/on-time trade depends on it, non-monotonically.
+- The rolling-horizon CP-SAT allows one slot per AV per horizon and gives no value to AV position or time at the horizon end. It can't plan AV timetables: a 24 h AV window costs about $0.7 per pallet more than 05–21, which acts as an implicit timetable.
 - One lane, two terminals, fixed AV operating window, no driver-pool constraint beyond HOS, deterministic travel times outside the disruption events.
 - Sweeps and ablations use 5 seeds. The main CP-SAT comparisons use 10; greedy and human baselines use 30.
-- The counterintuitive 24 h-vs-16 h AV-hours result is unexplained.
 
 ## Next steps
 1. Add a fixed per-trip AV cost and re-sweep the AV cost per mile.
-2. Look at traces for the 24 h AV window, and run 10 seeds on the hours sweep.
+2. AV timetable and positioning in the planner: allow several slots per AV per horizon, and put a terminal value on AV location and time at the horizon end. Check that the 24 h window then beats 05–21, and compare against an explicit fixed AV timetable under 24 h.
 3. Learn the defer continuation value from simulation (e.g. fitted backlog value) instead of the heuristic floor.
 4. Try a surge-aware CP-SAT variant (lower holding when the late-pickup rate spikes) to target the backlog weakness found in the disruption study.
 5. Extend to a multi-lane network with AV repositioning between lanes.

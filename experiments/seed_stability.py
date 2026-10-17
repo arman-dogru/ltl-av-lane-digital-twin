@@ -24,10 +24,11 @@ for j, (metric, lab, scale) in enumerate([("cost_per_pallet", "Δ cost/pallet $"
             # first n after which the running mean stays inside the final CI
             stable = next((n[i] for i in range(len(n)) if all(abs(mm - full_m) <= full_h for mm in m[i:])), n[-1])
             rows.append(dict(metric=lab, scenario=sc, policy=p, seeds=len(d), final=f"{full_m:.2f} ± {full_h:.2f}",
-                             at_5=f"{m[2]:.2f} ± {h[2]:.2f}" if len(m) > 2 else "—", at_10=f"{m[7]:.2f} ± {h[7]:.2f}" if len(m) > 7 else "—", stable_from_n=stable))
+                             at_5=f"{m[2]:.2f} ± {h[2]:.2f}" if len(m) > 2 else "—", at_10=f"{m[7]:.2f} ± {h[7]:.2f}" if len(m) > 7 else "—", stable_from_n=stable,
+                             in5=("yes" if abs(m[2] - full_m) <= full_h else "**no**"), final_in5=("yes" if abs(full_m - m[2]) <= h[2] else "**no**")))
             axes[j].plot(n, m, label=f"{p} / {sc}"); axes[j].fill_between(n, np.array(m) - h, np.array(m) + h, alpha=.15)
     axes[j].set_xlabel("seeds"); axes[j].set_ylabel(lab + " vs human_only"); axes[j].grid(alpha=.3)
 axes[0].legend(fontsize=8); fig.tight_layout(); fig.savefig("results/seed_stability.png", dpi=110)
-t = pd.DataFrame(rows); md = "| metric | scenario | policy | seeds | final (mean ± 95% CI) | at 5 seeds | at 10 seeds | running mean inside final CI from n = |\n|---|---|---|---|---|---|---|---|\n"
-md += "\n".join(f"| {r.metric} | {r.scenario} | {r.policy} | {r.seeds} | {r.final} | {r.at_5} | {r.at_10} | {r.stable_from_n} |" for r in t.itertuples())
+t = pd.DataFrame(rows); md = "| metric | scenario | policy | seeds | final (mean ± 95% CI) | at 5 seeds | at 10 seeds | running mean inside final CI from n = | 5-seed mean inside final CI | final mean inside 5-seed CI |\n|---|---|---|---|---|---|---|---|---|---|\n"
+md += "\n".join(f"| {r.metric} | {r.scenario} | {r.policy} | {r.seeds} | {r.final} | {r.at_5} | {r.at_10} | {r.stable_from_n} | {r.in5} | {r.final_in5} |" for r in t.itertuples())
 open("results/seed_stability.md", "w").write(md + "\n"); print(md)

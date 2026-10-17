@@ -2,7 +2,7 @@
 from .config import Config
 
 def parse(name: str):
-    """'balanced@av_fleet=3,demand=1.3,av_hours=(0,24)' -> ('balanced', {...}). `demand` scales shipments_per_day."""
+    """'balanced@av_fleet=3;demand=1.3;av_hours=(0,24)' -> ('balanced', {...}). `demand` scales shipments_per_day."""
     import ast
     base, _, rest = name.partition("@"); kw = {}
     for part in filter(None, rest.split(";")):
