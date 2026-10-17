@@ -160,10 +160,12 @@ What this means:
 | greedy Δ cost/pallet, imbalanced | 30 | −2.58 ± 0.13 | −2.59 ± 0.73 | −2.70 ± 0.33 | 13 |
 | greedy Δ on-time pp, balanced | 30 | −0.68 ± 0.13 | −0.91 ± 0.53 | −0.82 ± 0.26 | 11 |
 | greedy Δ on-time pp, imbalanced | 30 | −0.39 ± 0.15 | −0.45 ± 0.44 | −0.37 ± 0.29 | 4 |
-| cpsat Δ cost/pallet, balanced | 10 | −8.81 ± 0.30 | −8.88 ± 0.73 | — | (only 10 seeds) |
-| cpsat Δ on-time pp, imbalanced | 10 | −3.69 ± 0.40 | −3.48 ± 0.77 | — | (only 10 seeds) |
+| cpsat Δ cost/pallet, balanced | 10 | −8.81 ± 0.30 | −8.88 ± 0.73 | = final | 3 (of 10) |
+| cpsat Δ cost/pallet, imbalanced | 10 | −8.46 ± 0.36 | −8.19 ± 0.60 | = final | 3 (of 10) |
+| cpsat Δ on-time pp, balanced | 10 | −2.25 ± 0.28 | −2.38 ± 0.43 | = final | 3 (of 10) |
+| cpsat Δ on-time pp, imbalanced | 10 | −3.69 ± 0.40 | −3.48 ± 0.77 | = final | 5 (of 10) |
 
-All 5-seed estimates fall inside the corresponding final CI, and 10–13 seeds suffice for the running mean to settle within the 30-seed CI. Signs and rankings never change after n = 3. CP-SAT has only 10 seeds; its 5-seed values are within its own 10-seed CIs, but convergence beyond 10 is unverified.
+All 5-seed estimates fall inside the corresponding final CI, and 10–13 seeds suffice for the running mean to settle within the 30-seed CI. Every estimate's sign agrees with its final value by n = 5. CP-SAT has only 10 seeds; its 5-seed values are within its own 10-seed CIs, but convergence beyond 10 is unverified.
 
 ## Disruption case study (`experiments/disruptions.py`; balanced, 8 seeds, paired vs the same seed undisturbed)
 Day-7 events:
