@@ -82,7 +82,7 @@ Review history (PR #1):
 | balanced | human_only (30) | 0.926 ± 0.002 | 33.81 ± 0.16 | 35.17 ± 0.18 | 1.79 | 0.802 | 402 | 0 |
 | balanced | greedy_av_first (30) | 0.919 ± 0.003 | 30.57 ± 0.19 | 32.06 ± 0.22 | 2.23 | 0.816 | 327 | 0.173 |
 | balanced | **cpsat** (10) | 0.904 ± 0.003 | **24.91 ± 0.18** | **26.69 ± 0.15** | 4.76 | 0.981 | 257 | 0.217 |
-| balanced | cpsat, **no AVs** (5) | 0.933 ± 0.005 | 32.69 ± 0.48 | 33.92 ± 0.38 | 2.53 | 0.826 | 388 | 0 |
+| balanced | cpsat, **no AVs** (10) | 0.932 ± 0.003 | 32.40 ± 0.30 | 33.65 ± 0.28 | 2.57 | 0.834 | 386 | 0 |
 | imbalanced | human_only (30) | 0.924 ± 0.002 | 33.69 ± 0.18 | 35.09 ± 0.20 | 1.77 | 0.803 | 401 | 0 |
 | imbalanced | greedy_av_first (30) | 0.920 ± 0.002 | 31.11 ± 0.20 | 32.58 ± 0.21 | 2.16 | 0.813 | 334 | 0.155 |
 | imbalanced | **cpsat** (10) | 0.882 ± 0.006 | **25.38 ± 0.38** | **27.54 ± 0.31** | 5.11 | 0.970 | 264 | 0.209 |
@@ -93,18 +93,19 @@ Paired differences:
 |---|---|---|---|---|
 | balanced | cpsat − human_only | −2.25 ± 0.28 | −8.81 ± 0.30 | +2.97 ± 0.09 |
 | balanced | cpsat − greedy_av_first | −1.43 ± 0.18 | −5.69 ± 0.44 | +2.54 ± 0.10 |
-| balanced | cpsat (no AVs) − human_only | +0.63 ± 0.48 | −1.07 ± 0.36 | +0.75 ± 0.17 |
+| balanced | cpsat (no AVs) − human_only | +0.62 ± 0.21 | −1.33 ± 0.34 | +0.78 ± 0.07 |
 | imbalanced | cpsat − human_only | −3.69 ± 0.40 | −8.46 ± 0.36 | +3.35 ± 0.13 |
 | imbalanced | cpsat − greedy_av_first | −3.32 ± 0.45 | −5.77 ± 0.39 | +2.96 ± 0.13 |
 
-### Defer-floor sensitivity (balanced, seeds 0–4, paired vs human_only)
+### Defer-floor sensitivity (balanced, 10 seeds, paired vs human_only)
 | Defer floor | Δ cost/pallet $ | Δ on-time (pp) | Δ dwell h |
 |---|---|---|---|
-| ×0.5 marginal | −8.84 ± 0.68 | −1.31 ± 0.53 | +4.43 |
-| **marginal (default)** | −8.81 ± 0.30 (10 seeds) | −2.25 ± 0.28 | +2.97 |
-| ×1.5 marginal | −8.69 ± 0.72 | −2.03 ± 0.54 | +2.05 |
-| always human rate | −8.80 ± 0.69 | −1.95 ± 0.31 | +2.14 |
-| always AV rate | −9.06 ± 0.67 | −1.54 ± 0.47 | +4.40 |
+| ×0.5 marginal | −8.76 ± 0.29 | −1.13 ± 0.28 | +4.33 |
+| **marginal (default)** | −8.81 ± 0.30 | −2.25 ± 0.28 | +2.97 |
+| ×1.5 marginal | −8.72 ± 0.32 | −1.87 ± 0.28 | +2.04 |
+| always human rate | −8.83 ± 0.31 | −1.81 ± 0.21 | +2.13 |
+| always AV rate | −9.04 ± 0.31 | −1.39 ± 0.31 | +4.41 |
+| no AVs (control) | −1.33 ± 0.34 | +0.62 ± 0.21 | +0.78 |
 
 ### Ablations (balanced, 5 seeds, paired vs human_only)
 | Variant | Δ cost/pallet $ | Δ on-time (pp) | Δ dwell h | Note |
@@ -120,8 +121,8 @@ Paired differences:
 Known limitation of the floor (issue #2): `av_share` counts AV capacity *inside* the planning window, which in-window AV slots can already use. So it partly double-counts that capacity as an outlet for deferred freight, and the floor is a heuristic, not an exact continuation value. The sweep above bounds the effect: cost is insensitive to it, dwell is not.
 
 What this means:
-- **The cost result is robust to the objective's defer floor.** Scaling the floor from ×0.5 to the full human rate moves cost by under $0.40 per pallet. What the floor really controls is the dwell vs on-time trade: a cheaper floor gives longer holds and *better* on-time (the solver waits for AV slots), while a pricier floor gives shorter holds.
-- **Dispatching alone isn't the source of the saving; AVs are what make consolidation pay.** The same CP-SAT dispatcher without AVs saves only $1.07 per pallet over human-only, at +0.6 pp on-time. With AVs it saves $8.81, so about 88% of the optimizer's saving depends on AV capacity. With AVs as an outlet for the residual partial loads, human trucks run nearly full (fill 0.98 vs 0.83). The greedy heuristic captures only $3.24 of that value.
+- **The cost result is robust to the objective's defer floor.** Across ×0.5 to the full human rate, cost moves by under $0.40 per pallet. What the floor controls is the dwell vs on-time trade, and not monotonically. With 10 seeds (issue #2), floors at or below the AV rate hold freight about 4.4 h longer and lose the least on-time (×0.5: −1.13 ± 0.28 pp; AV rate: −1.39 ± 0.31). The human-rate and ×1.5 floors hold about 2.1 h (−1.81, −1.87 pp). The default marginal floor sits between them on dwell (+3.0 h) but loses the most on-time (−2.25 ± 0.28 pp). Read this as "the floor trades dwell against service in a non-linear way", not as "cheaper floors are better".
+- **Dispatching alone isn't the source of the saving; AVs are what make consolidation pay.** The same CP-SAT dispatcher without AVs saves only $1.33 ± 0.34 per pallet over human-only (10 seeds), at +0.6 pp on-time. With AVs it saves $8.81, so about 85% of the optimizer's saving depends on AV capacity. With AVs as an outlet for the residual partial loads, human trucks run nearly full (fill 0.98 vs 0.83). The greedy heuristic captures only $3.24 of that value.
 - **The optimizer pays for this in service:** −2.3 pp on-time balanced and −3.7 pp imbalanced, plus about 3 h more dwell. The imbalanced lane hurts more because back-haul freight waits to fill. The cost/service trade is a business choice. Including a $75/late-shipment charge, CP-SAT is still the cheapest ($26.69 vs $35.17).
 - **Planning horizon:** looking ahead matters most for AV use. Horizon 0 drops the AV share to 0.15 and costs about $0.75 per pallet more than 8–12 h.
 - **Inert features:** direct-to-3P delivery and empty repositioning never trigger under CP-SAT in this setting, because consolidated mixed trailers are never single-endpoint loads. They matter only for the greedy baseline.
