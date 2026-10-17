@@ -6,6 +6,7 @@
 | human_only | 30 | 0.926 ± 0.002 | 33.81 ± 0.16 | 35.17 ± 0.18 | 1.79 ± 0.01 | — | 0.802 ± 0.004 | 0.000 ± 0.000 | 0.000 ± 0.000 | 402 ± 4 |
 | av_fixed | 30 | 0.913 ± 0.002 | 32.60 ± 0.19 | 34.20 ± 0.21 | 2.36 ± 0.01 | 0.538 ± 0.017 | 0.840 ± 0.005 | 0.075 ± 0.002 | 0.313 ± 0.004 | 355 ± 3 |
 | greedy_av_first | 30 | 0.919 ± 0.003 | 30.57 ± 0.19 | 32.06 ± 0.22 | 2.23 ± 0.02 | 0.882 ± 0.006 | 0.816 ± 0.006 | 0.173 ± 0.003 | 0.467 ± 0.006 | 327 ± 4 |
+| cpsat | 10 | 0.912 ± 0.004 | 24.83 ± 0.23 | 26.45 ± 0.18 | 5.22 ± 0.16 | 0.983 ± 0.006 | 0.979 ± 0.012 | 0.221 ± 0.003 | 0.552 ± 0.004 | 257 ± 7 |
 
 Paired difference vs human_only (balanced; same seeds = same demand)
 
@@ -13,6 +14,7 @@ Paired difference vs human_only (balanced; same seeds = same demand)
 |---|---|---|---|---|
 | av_fixed | 30 | -1.28 ± 0.13 | -1.21 ± 0.12 | 0.57 ± 0.01 |
 | greedy_av_first | 30 | -0.68 ± 0.13 | -3.24 ± 0.12 | 0.44 ± 0.01 |
+| cpsat | 10 | -1.37 ± 0.40 | -8.89 ± 0.44 | 3.43 ± 0.16 |
 
 ### imbalanced
 
@@ -21,6 +23,7 @@ Paired difference vs human_only (balanced; same seeds = same demand)
 | human_only | 30 | 0.924 ± 0.002 | 33.69 ± 0.18 | 35.09 ± 0.20 | 1.77 ± 0.01 | — | 0.803 ± 0.005 | 0.000 ± 0.000 | 0.000 ± 0.000 | 401 ± 5 |
 | av_fixed | 30 | 0.915 ± 0.002 | 32.68 ± 0.20 | 34.24 ± 0.23 | 2.31 ± 0.02 | 0.546 ± 0.017 | 0.836 ± 0.005 | 0.076 ± 0.003 | 0.309 ± 0.004 | 356 ± 4 |
 | greedy_av_first | 30 | 0.920 ± 0.002 | 31.11 ± 0.20 | 32.58 ± 0.21 | 2.16 ± 0.02 | 0.880 ± 0.007 | 0.813 ± 0.005 | 0.155 ± 0.004 | 0.420 ± 0.009 | 334 ± 4 |
+| cpsat | 10 | 0.900 ± 0.006 | 25.17 ± 0.35 | 27.00 ± 0.29 | 5.39 ± 0.23 | 0.975 ± 0.005 | 0.972 ± 0.013 | 0.213 ± 0.005 | 0.541 ± 0.008 | 262 ± 6 |
 
 Paired difference vs human_only (imbalanced; same seeds = same demand)
 
@@ -28,3 +31,22 @@ Paired difference vs human_only (imbalanced; same seeds = same demand)
 |---|---|---|---|---|
 | av_fixed | 30 | -0.86 ± 0.12 | -1.01 ± 0.13 | 0.54 ± 0.01 |
 | greedy_av_first | 30 | -0.39 ± 0.15 | -2.58 ± 0.13 | 0.40 ± 0.01 |
+| cpsat | 10 | -1.90 ± 0.42 | -8.67 ± 0.37 | 3.63 ± 0.24 |
+
+### CP-SAT solver health
+
+| variant | runs | solves | time-limited (feasible, not proven optimal) | fallbacks to greedy |
+|---|---|---|---|---|
+| cpsat | 20 | 13613 | 8.3% | 0.00% |
+
+Paired difference vs greedy_av_first (balanced)
+
+| policy | seeds | Δ on-time (pp) | Δ cost/pallet $ | Δ dwell h |
+|---|---|---|---|---|
+| cpsat | 10 | -0.56 ± 0.41 | -5.77 ± 0.54 | 3.00 ± 0.16 |
+
+Paired difference vs greedy_av_first (imbalanced)
+
+| policy | seeds | Δ on-time (pp) | Δ cost/pallet $ | Δ dwell h |
+|---|---|---|---|---|
+| cpsat | 10 | -1.52 ± 0.48 | -5.97 ± 0.49 | 3.24 ± 0.24 |
