@@ -15,7 +15,7 @@ This is a SimPy discrete-event model of an LTL network around one autonomous lin
 - `tests/`: conservation, trailer capacity, AV operating window and weather hold, determinism, and that AV fleet = 0 reduces to human-only.
 
 ## Calibration
-The deadline window was swept for the human-only baseline (5 seeds per point, `experiments/calibrate.py` → `results/calibration_sla.json`). A window of `ready + U[12, 28] h` puts human-only at about 92.5% on-time, which leaves room for policies to differ. Windows of 18–30 h (the original default) gave 98.5%, and 8–20 h gave 79.8%.
+The deadline window was swept for the human-only baseline (5 seeds per point, seeds 1000–1004, disjoint from the evaluation seeds 0–29; `experiments/calibrate.py` → `results/calibration_sla.json`). A window of `ready + U[12, 28] h` puts human-only at about 92.5% on-time, which leaves room for policies to differ. Windows of 18–30 h (the original default) gave 98.5%, and 8–20 h gave 79.8%.
 
 ## Scenarios
 Both scenarios have 200 shipments/day in total (`ltltwin/scenarios.py`):
