@@ -9,7 +9,7 @@ from .config import Config, HOUR, DAY
 class Shipment:
     sid: int; origin: str; dest: str; consignee: str; pallets: int; ready: float; due: float
     in_pool: float = math.nan; departed: float = math.nan; delivered: float = math.nan
-    mode: str = ""; direct: bool = False
+    mode: str = ""; direct: bool = False; created: float = math.nan
     @property
     def to_endpoint(self) -> bool: return self.consignee != self.dest
 
@@ -42,7 +42,7 @@ class Twin:
         self.shipments: list[Shipment] = []; self.trips: list[Trip] = []
         n = cfg.av_fleet; self.avs = [AV(i, cfg.terminals[i % 2]) for i in range(n)]
         self.cost = {"human_miles": 0.0, "av_miles": 0.0, "human_dispatches": 0}
-        self._sid = 0
+        self._sid = 0; self.trace = []   # (t, pallets waiting per terminal) each control tick
 
     # ---------------- demand ----------------
     def _demand(self, origin: str):
@@ -55,8 +55,12 @@ class Twin:
                 pal = int(self.rng.integers(cfg.pallets_per_shipment[0], cfg.pallets_per_shipment[1] + 1))
                 cons = str(self.rng.choice(cfg.endpoints[dest])) if self.rng.random() < cfg.endpoint_share else dest
                 due = t + HOUR * self.rng.uniform(*cfg.sla_hours)
-                ready = t + (HOUR * self.rng.uniform(*cfg.late_pickup_hours) if self.rng.random() < cfg.late_pickup_prob else 0.0)
-                s = Shipment(self._sid, origin, dest, cons, pal, ready, due); self._sid += 1; self.shipments.append(s)
+                in_win = not cfg.late_pickup_window or cfg.late_pickup_window[0] <= t < cfg.late_pickup_window[1]
+                # draw order matches the original model exactly (slip drawn only when late) so seeds reproduce earlier grids
+                late = self.rng.random() < cfg.late_pickup_prob
+                slip = HOUR * self.rng.uniform(*cfg.late_pickup_hours) if late else 0.0
+                ready = t + (slip if in_win else 0.0)
+                s = Shipment(self._sid, origin, dest, cons, pal, ready, due, created=t); self._sid += 1; self.shipments.append(s)
                 if ready < horizon: self.env.process(self._arrive(s))
         yield self.env.timeout(0)
 
@@ -121,6 +125,7 @@ class Twin:
     def _control(self):
         cfg = self.cfg
         while True:
+            self.trace.append((self.env.now, *(sum(x.pallets for x in self.pool[t]) for t in cfg.terminals)))
             for d in self.policy(self, self.env.now):
                 for s in d.shipments: self.pool[d.origin].remove(s)
                 av = None

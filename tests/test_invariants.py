@@ -37,3 +37,19 @@ def test_deterministic_per_seed():
 def test_no_av_fleet_equals_human_only():
     k1 = kpis(Twin(small(av_fleet=0), GreedyAVFirst(), seed=3).run()); k2 = kpis(Twin(small(av_fleet=0), HumanOnly(), seed=3).run())
     assert k1["on_time"] == k2["on_time"] and k1["human_trips"] == k2["human_trips"]
+
+def test_seed_reproduces_frozen_baseline_row():
+    """Guards against RNG-stream changes: must equal the committed grid row for (balanced, human_only, seed 0)."""
+    import csv
+    from ltltwin.scenarios import scenario
+    from pathlib import Path
+    csv_path = Path(__file__).resolve().parent.parent / "results" / "grid_baselines.csv"
+    row = next(r for r in csv.DictReader(open(csv_path)) if r["scenario"] == "balanced" and r["policy"] == "human_only" and r["seed"] == "0")
+    k = kpis(Twin(scenario("balanced"), HumanOnly(), seed=0).run())
+    assert abs(k["on_time"] - float(row["on_time"])) < 1e-9 and abs(k["cost_per_pallet"] - float(row["cost_per_pallet"])) < 1e-9
+
+def test_late_pickup_window_only_affects_window():
+    from ltltwin.config import DAY
+    tw = Twin(small(late_pickup_prob=1.0, late_pickup_window=(2 * DAY, 3 * DAY)), HumanOnly(), seed=0).run()
+    for s in tw.shipments:
+        assert (s.ready > s.created) == (2 * DAY <= s.created < 3 * DAY)

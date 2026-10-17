@@ -36,12 +36,13 @@ class Config:
     endpoint_share: float = 0.35            # share of shipments consigned to a 3P endpoint (else to the terminal)
     # ready-time profile: most freight arrives at the origin terminal after afternoon P&D sweeps
     hourly_profile: tuple = (1,1,1,1,1,1,2,2,3,3,4,4,4,5,6,8,10,10,9,7,5,3,2,1)
-    sla_hours: tuple = (18, 30)             # due = ready + U[sla_lo, sla_hi] hours (next-day / day-two mix)
+    sla_hours: tuple = (12, 28)             # due = ready + U[lo, hi] h; calibrated so human-only ~92.5% on-time (experiments/calibrate.py)
     # --- disruptions (off by default) -------------------------------------------
     weather_hold: tuple = ()                # ((start_min, end_min), ...): AV departures blocked
     dock_outage: tuple = ()                 # ((terminal, start_min, end_min, doors_lost), ...)
     late_pickup_prob: float = 0.0           # share of shipments whose ready time slips
     late_pickup_hours: tuple = (1, 4)
+    late_pickup_window: tuple = ()          # (start_min, end_min): restrict late pickups to a surge window; () = whole run
     # --- dispatcher -------------------------------------------------------------
     tick_min: int = 15                      # decision epoch
     human_sweep_hours: tuple = (22, 2)      # fixed human linehaul departures (local hour) used by baselines

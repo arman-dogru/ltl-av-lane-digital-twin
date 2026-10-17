@@ -22,3 +22,10 @@ def kpis(tw) -> dict:
                 av_share_pallets=sum(s.pallets for s in done if s.mode == "av") / max(1, sum(s.pallets for s in done)),
                 direct_share=sum(s.direct for s in done if s.to_endpoint) / max(1, sum(s.to_endpoint for s in done)),
                 av_util=av_util, cost_per_pallet=cost / pal, cost_incl_late_per_pallet=(cost + n_late * cfg.late_penalty_per_shipment) / pal)
+
+def window_kpis(tw, t0: float, t1: float) -> dict:
+    """On-time / lateness for shipments whose original pickup time (`created`, before any slip) is in [t0, t1)."""
+    S = [s for s in tw.shipments if t0 <= s.created < t1]
+    late = [s for s in S if math.isnan(s.delivered) or s.delivered > s.due]
+    lh = [max(0.0, (s.delivered - s.due) / HOUR) for s in S if not math.isnan(s.delivered)]
+    return dict(n=len(S), on_time=1 - len(late) / max(1, len(S)), late_hours_total=float(np.sum(lh)))
