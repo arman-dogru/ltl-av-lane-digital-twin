@@ -1,0 +1,12 @@
+policy                            av_fixed  greedy_av_first       human_only
+on_time                      0.974 ± 0.001    0.979 ± 0.001    0.984 ± 0.001
+dwell_mean_h                 2.632 ± 0.024    2.510 ± 0.014    1.896 ± 0.009
+fill_av                      0.664 ± 0.012    0.927 ± 0.005        nan ± nan
+fill_human                   0.903 ± 0.003    0.887 ± 0.004    0.883 ± 0.003
+av_share_pallets             0.095 ± 0.002    0.183 ± 0.004    0.000 ± 0.000
+av_util                      0.327 ± 0.003    0.475 ± 0.009    0.000 ± 0.000
+human_trips                323.750 ± 4.460  298.050 ± 4.352  366.150 ± 4.209
+cost_per_pallet             29.941 ± 0.127   28.120 ± 0.144   30.695 ± 0.075
+cost_incl_late_per_pallet   30.419 ± 0.135   28.509 ± 0.153   30.989 ± 0.087
+av_fixed paired Δon_time -0.010 ± 0.001 Δcost/pallet -0.754 ± 0.115
+greedy_av_first paired Δon_time -0.005 ± 0.001 Δcost/pallet -2.575 ± 0.122
