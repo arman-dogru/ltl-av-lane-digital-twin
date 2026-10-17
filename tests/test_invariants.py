@@ -42,7 +42,9 @@ def test_seed_reproduces_frozen_baseline_row():
     """Guards against RNG-stream changes: must equal the committed grid row for (balanced, human_only, seed 0)."""
     import csv
     from ltltwin.scenarios import scenario
-    row = next(r for r in csv.DictReader(open("results/grid_baselines.csv")) if r["scenario"] == "balanced" and r["policy"] == "human_only" and r["seed"] == "0")
+    from pathlib import Path
+    csv_path = Path(__file__).resolve().parent.parent / "results" / "grid_baselines.csv"
+    row = next(r for r in csv.DictReader(open(csv_path)) if r["scenario"] == "balanced" and r["policy"] == "human_only" and r["seed"] == "0")
     k = kpis(Twin(scenario("balanced"), HumanOnly(), seed=0).run())
     assert abs(k["on_time"] - float(row["on_time"])) < 1e-9 and abs(k["cost_per_pallet"] - float(row["cost_per_pallet"])) < 1e-9
 

@@ -20,15 +20,19 @@ VARIANTS = {
     "cpsat_buf0": lambda: CPSATDispatcher(buffer_min=0), "cpsat_buf90": lambda: CPSATDispatcher(buffer_min=90),
     "cpsat_late150": lambda: CPSATDispatcher(late_fixed=150, late_per_h=25), "cpsat_late1500": lambda: CPSATDispatcher(late_fixed=1500, late_per_h=250),
     "cpsat_warm": lambda: CPSATDispatcher(warm_start=True), "cpsat_noav": lambda: CPSATDispatcher(),
+    "cpsat_floor_x0.5": lambda: CPSATDispatcher(defer_scale=0.5), "cpsat_floor_x1.5": lambda: CPSATDispatcher(defer_scale=1.5),
+    "cpsat_floor_human": lambda: CPSATDispatcher(defer_floor="human"), "cpsat_floor_av": lambda: CPSATDispatcher(defer_floor="av"),
     "cpsat_nodirect": lambda: CPSATDispatcher(direct=False), "cpsat_norepo": lambda: CPSATDispatcher(reposition=False),
 }
 CFG = {"cpsat_noav": dict(av_fleet=0)}   # per-variant scenario overrides (no-AV control: same dispatcher, no AV trucks)
 BASE = ["human_only", "av_fixed", "greedy_av_first"]
 GRIDS = {
     "baselines": [(sc, v, s) for sc in ("balanced", "imbalanced") for v in BASE for s in range(30)],
+    # reviewer-blocking evidence first: default vs defer-floor sweep vs no-AV control (balanced, seeds 0-4)
+    "review": [("balanced", v, s) for v in ("cpsat", "cpsat_floor_x0.5", "cpsat_floor_x1.5", "cpsat_floor_human", "cpsat_floor_av", "cpsat_noav") for s in range(5)],
     "main": [(sc, "cpsat", s) for sc in ("balanced", "imbalanced") for s in range(10)],
     # reviewer-requested horizon checks + controls first; 5 seeds (paired with the same seeds of `main`)
-    "ablations": [("balanced", v, s) for v in ("cpsat_myopic", "cpsat_h4", "cpsat_h12", "cpsat_noav", "cpsat_warm", "cpsat_norepo", "cpsat_nodirect") for s in range(5)],
+    "ablations": [("balanced", v, s) for v in ("cpsat_myopic", "cpsat_h4", "cpsat_h12", "cpsat_warm", "cpsat_norepo", "cpsat_nodirect") for s in range(5)],
     "ablations_more": [("balanced", v, s) for v in ("cpsat_buf0", "cpsat_buf90", "cpsat_late150", "cpsat_late1500", "cpsat_reopt30", "cpsat_reopt120") for s in range(5)],
 }
 
@@ -41,8 +45,9 @@ def run(cell):
 if __name__ == "__main__":
     grid, workers = sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 4
     path = f"results/grid_{grid}.csv"; done = set()
-    if os.path.exists(path):
-        with open(path) as f: done = {(r["scenario"], r["policy"], int(r["seed"])) for r in csv.DictReader(f)}
+    import glob   # a cell finished in ANY grid is reused (CP-SAT with a time limit is not bit-deterministic, so never run a cell twice)
+    for other in glob.glob("results/grid_*.csv"):
+        with open(other) as f: done |= {(r["scenario"], r["policy"], int(r["seed"])) for r in csv.DictReader(f)}
     todo = [c for c in GRIDS[grid] if c not in done]; print(f"{grid}: {len(todo)} runs to do ({len(done)} cached)", flush=True)
     with ProcessPoolExecutor(workers) as ex:
         for fut in as_completed([ex.submit(run, c) for c in todo]):

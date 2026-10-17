@@ -31,19 +31,37 @@ def test_urgent_freight_ships_now():
     assert len(ds) == 1 and ds[0].vehicle == "human"
 
 def test_deferral_is_not_free():
-    """Deferring a shipment must cost at least its share of the cheapest full linehaul (reviewer finding on PR #1)."""
+    """Deferring must cost at least the pallet share of a full linehaul at the marginal rate (PR #1 review)."""
     cfg = small(); tw = Twin(cfg, lambda *_: [], seed=0); P = CPSATDispatcher()
     s = Shipment(0, "DAL", "HOU", "HOU", 6, 0, 100 * HOUR)          # far from due: no lateness component
-    floor = 6 * min(cfg.lane_miles * cfg.av_cost_per_mile, cfg.lane_miles * cfg.human_cost_per_mile + cfg.human_dispatch_fixed) / cfg.trailer_pallets
-    assert P.defer_cost(tw, s, 0.0) >= floor > 0
+    av_rate = cfg.lane_miles * cfg.av_cost_per_mile / cfg.trailer_pallets
+    assert P.defer_cost(tw, s, 0.0, av_share=1.0) >= 6 * av_rate > 0
 
-def test_full_trailer_ships_within_horizon_rather_than_deferring():
-    """With a full trailer's worth of non-urgent freight and an idle AV, deferring everything must not be optimal."""
-    cfg = small(); tw = Twin(cfg, lambda *_: [], seed=0); now = 8 * HOUR
+def test_defer_rate_is_human_rate_without_av_capacity():
+    """No AV slot in the horizon -> deferral priced at the human rate (PR #1 re-review, finding 1)."""
+    cfg = small(); tw = Twin(cfg, lambda *_: [], seed=0); P = CPSATDispatcher()
+    hu = (cfg.lane_miles * cfg.human_cost_per_mile + cfg.human_dispatch_fixed) / cfg.trailer_pallets
+    av = cfg.lane_miles * cfg.av_cost_per_mile / cfg.trailer_pallets
+    assert abs(P.defer_rate(tw, 0.0) - hu) < 1e-9 and abs(P.defer_rate(tw, 1.0) - av) < 1e-9 and av < P.defer_rate(tw, 0.5) < hu
+
+def _full_trailer_case(av_fleet):
+    cfg = small(av_fleet=av_fleet); tw = Twin(cfg, lambda *_: [], seed=0); now = 8 * HOUR
     pool = [Shipment(i, "DAL", "HOU", "HOU", 13, 0, now + 60 * HOUR) for i in range(2)]   # 26 pallets, due in 60 h
-    P = CPSATDispatcher(horizon_h=0, time_limit_s=1)   # only 'now' slots: ship now vs defer
+    return cfg, tw, now, pool
+
+def test_full_trailer_ships_now_on_human_truck_when_no_av():
+    """Only option now is a human truck: a full trailer must ship within the horizon, and by a non-marginal margin."""
+    cfg, tw, now, pool = _full_trailer_case(av_fleet=0); P = CPSATDispatcher(time_limit_s=2)
     ds = P.plan(tw, now, "DAL", pool)
-    assert ds and sum(len(d.shipments) for d in ds) == 2
+    assert ds and all(d.vehicle == "human" for d in ds) and sum(len(d.shipments) for d in ds) == 2
+    trip = cfg.lane_miles * cfg.human_cost_per_mile + cfg.human_dispatch_fixed
+    margin = sum(P.defer_cost(tw, s, now, av_share=0.0) for s in pool) - trip
+    assert margin >= 100, margin       # holding cost over the horizon, not a $2 tie-break
+
+def test_full_trailer_ships_on_idle_av():
+    cfg, tw, now, pool = _full_trailer_case(av_fleet=2); P = CPSATDispatcher(time_limit_s=2)
+    ds = P.plan(tw, now, "DAL", pool)
+    assert ds and ds[0].vehicle == "av" and sum(len(d.shipments) for d in ds) == 2
 
 def test_warm_start_runs_and_conserves():
     P = CPSATDispatcher(time_limit_s=0.3, warm_start=True); tw = Twin(small(), P, seed=2).run()

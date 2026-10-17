@@ -14,9 +14,10 @@ from .policies import eta_delivery, build_load, pallets, GreedyAVFirst
 
 class CPSATDispatcher:
     name = "cpsat"
-    def __init__(self, horizon_h=8, reopt_min=60, slot_h=1, direct=True, wait_cost_per_h=1.0, time_limit_s=1.0, reposition=True, late_fixed=300.0, late_per_h=50.0, buffer_min=30.0, warm_start=False):
+    def __init__(self, horizon_h=8, reopt_min=60, slot_h=1, direct=True, wait_cost_per_pallet_h=0.5, time_limit_s=1.0, reposition=True, late_fixed=300.0, late_per_h=50.0, buffer_min=30.0, warm_start=False, defer_floor="marginal", defer_scale=1.0):
         self.h, self.reopt, self.slot, self.direct = horizon_h, reopt_min, slot_h, direct
-        self.wait_cost, self.tl, self.reposition = wait_cost_per_h, time_limit_s, reposition
+        self.wait_cost, self.tl, self.reposition = wait_cost_per_pallet_h, time_limit_s, reposition
+        assert defer_floor in ("marginal", "human", "av"); self.defer_floor, self.defer_scale = defer_floor, defer_scale
         self.late_fixed, self.late_per_h, self.buffer = late_fixed, late_per_h, buffer_min
         self.warm = warm_start; self._prev = {}   # sid -> (vehicle, av_id, slot_time) from the previous epoch's plan
         self._last = -math.inf; self.stats = dict(solves=0, optimal=0, feasible=0, fallback=0)
@@ -26,14 +27,22 @@ class CPSATDispatcher:
         eta = eta + self.buffer   # same safety margin as the baselines' at-risk rule (dock queueing, loading variance)
         return 0.0 if eta <= due else self.late_fixed + self.late_per_h * (eta - due) / HOUR
 
-    def defer_cost(self, tw, s, now):
-        """Deferring past the horizon is not free: the shipment still needs a linehaul later (charged at its pallet
-        share of the cheapest *full* trailer, i.e. a lower bound on future transport cost), plus the lateness it
-        would incur leaving at the horizon end, plus waiting cost up to then."""
-        cfg = tw.cfg; end = now + self.h * HOUR + self.slot * HOUR
-        av_trip = cfg.lane_miles * cfg.av_cost_per_mile; hu_trip = cfg.lane_miles * cfg.human_cost_per_mile + cfg.human_dispatch_fixed
-        per_pallet = (min(av_trip, hu_trip) if cfg.av_fleet > 0 else hu_trip) / cfg.trailer_pallets
-        return s.pallets * per_pallet + self.late_cost(eta_delivery(tw, s, end, "human", False), s.due) + self.wait_cost * (end - now) / HOUR
+    def defer_rate(self, tw, av_share: float) -> float:
+        """Per-pallet price of the linehaul a deferred shipment will still need.
+        marginal (default): capacity-weighted blend of AV and human full-trailer rates, where av_share is the AV
+        capacity actually available in this horizon divided by the pallets waiting (0 if no AV slot -> human rate).
+        human / av: fixed floors used in the sensitivity sweep. defer_scale multiplies the result."""
+        cfg = tw.cfg; P = cfg.trailer_pallets
+        av = cfg.lane_miles * cfg.av_cost_per_mile / P; hu = (cfg.lane_miles * cfg.human_cost_per_mile + cfg.human_dispatch_fixed) / P
+        r = {"human": hu, "av": av, "marginal": av_share * av + (1 - av_share) * hu}[self.defer_floor]
+        return self.defer_scale * r
+
+    def defer_cost(self, tw, s, now, av_share: float = 0.0):
+        """Deferring past the horizon is not free: future linehaul (defer_rate) + lateness if it left at the horizon
+        end + holding cost (per pallet-hour) up to then."""
+        end = now + self.h * HOUR + self.slot * HOUR
+        return (s.pallets * self.defer_rate(tw, av_share) + self.late_cost(eta_delivery(tw, s, end, "human", False), s.due)
+                + self.wait_cost * s.pallets * (end - now) / HOUR)
 
     def _next_allowed(self, tw, t):
         step = tw.cfg.tick_min; n = 0
@@ -60,12 +69,14 @@ class CPSATDispatcher:
         x = {(i, k): m.NewBoolVar("") for i in range(len(pool)) for k in range(len(slots))}
         defer = [m.NewBoolVar("") for _ in pool]; y = [m.NewBoolVar("") for _ in slots]
         cost = []
+        n_av = len({aid for v, aid, _ in slots if v == "av"})        # distinct AVs with a slot in this horizon
+        av_share = min(1.0, n_av * P / max(1, sum(sh.pallets for sh in pool)))
         for i, s in enumerate(pool):
             m.AddExactlyOne([x[i, k] for k in range(len(slots))] + [defer[i]])
             end = now + self.h * HOUR + self.slot * HOUR
-            cost.append(defer[i] * int(round(self.defer_cost(tw, s, now))))
+            cost.append(defer[i] * int(round(self.defer_cost(tw, s, now, av_share))))
             for k, (v, _, t) in enumerate(slots):
-                c = self.late_cost(eta_delivery(tw, s, t, v, False), s.due) + self.wait_cost * (t - now) / HOUR
+                c = self.late_cost(eta_delivery(tw, s, t, v, False), s.due) + self.wait_cost * s.pallets * (t - now) / HOUR
                 cost.append(x[i, k] * int(round(c)))
         for k, (v, aid, t) in enumerate(slots):
             m.Add(sum(x[i, k] * s.pallets for i, s in enumerate(pool)) <= P * y[k])
