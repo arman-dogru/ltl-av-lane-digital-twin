@@ -12,7 +12,7 @@ This is a SimPy discrete-event model of an LTL network around one autonomous lin
 - `experiments/`: calibrate, run_grid (resumable and parallel), summarize.
 - `ltltwin/policies.py`: `HumanOnly`, `AVFixed` (fixed headway), `GreedyAVFirst` (fill threshold plus empty repositioning).
 - `ltltwin/kpi.py`: on-time %, dwell, trailer fill, AV utilization and share, cost per pallet (with and without late penalty).
-- `tests/`: conservation, trailer capacity, AV operating window and weather hold, determinism, and that AV fleet = 0 reduces to human-only.
+- `tests/`: conservation, trailer capacity, AV operating window and weather hold, determinism, and that AV fleet = 0 reduces to human-only; config validation (bad AV hours, oversized shipments, tick_min <= 0, …) and overnight AV windows.
 
 ## Assumptions (all in `ltltwin/config.py`; none are Waabi, Volvo or Warp figures)
 | Area | Parameter | Default | Basis / note | Swept? |
@@ -217,7 +217,7 @@ Narrative:
 ## Reproduce
 ```bash
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt   # pinned
-.venv/bin/python -m pytest -q tests                            # 26 tests
+.venv/bin/python -m pytest -q tests                            # 45 tests
 WORKERS=4 ./run_all.sh                                        # resumable grids -> results/grid_*.csv
 ./run_followup.sh                                             # review10 + sweeps grids, 20-seed disruptions (log: results/followup.log)
 .venv/bin/python experiments/av_hours_mechanism.py         # -> results/av_hours_mechanism.md (paired 24h-16h + traces)

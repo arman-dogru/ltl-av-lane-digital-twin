@@ -35,6 +35,7 @@ def local_hour(t: float) -> float: return (t % DAY) / HOUR
 
 class Twin:
     def __init__(self, cfg: Config, policy, seed: int = 0):
+        cfg.validate()   # again here: fields may have been changed after construction (e.g. scenario demand scaling)
         self.cfg, self.policy, self.rng = cfg, policy, np.random.default_rng(seed)
         worst = cfg.transit_min(av=False, to_endpoint=True) / 60.0
         if worst > cfg.human_driver_hours:   # model assumes a one-way linehaul fits in one HOS drive window (no relays)
@@ -75,8 +76,7 @@ class Twin:
 
     # ---------------- disruptions ----------------
     def av_blocked(self, t: float) -> bool:
-        h = local_hour(t); a, b = self.cfg.av_hours
-        return not (a <= h < b) or any(s <= t < e for s, e in self.cfg.weather_hold)
+        return not self.cfg.av_window_open(local_hour(t)) or any(s <= t < e for s, e in self.cfg.weather_hold)
 
     def _dock_outages(self):
         for term, s, e, lost in self.cfg.dock_outage:

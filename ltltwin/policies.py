@@ -78,7 +78,7 @@ class AVFixed(HumanOnly):
         out = []; a, b = tw.cfg.av_hours
         for term in tw.cfg.terminals:
             pool = list(tw.pool[term]); h = local_hour(now)
-            slot = (a <= h < b) and ((h - a) % self.headway) < tw.cfg.tick_min / 60
+            slot = tw.cfg.av_window_open(h) and (((h - a) % 24) % self.headway) < tw.cfg.tick_min / 60
             if slot and not tw.av_blocked(now):
                 for av in tw.idle_avs(term):
                     stop, load = build_load(tw, pool, "av")

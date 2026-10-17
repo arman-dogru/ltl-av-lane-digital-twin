@@ -74,3 +74,45 @@ def test_hos_limit_is_validated():
 def test_sweep_hours_come_from_config():
     a = kpis(Twin(small(human_sweep_hours=(22, 2)), HumanOnly(), seed=4).run()); b = kpis(Twin(small(human_sweep_hours=(20,)), HumanOnly(), seed=4).run())
     assert a != b
+
+
+# --- config validation (PR #3 review, finding 3) ----------------------------------------------------
+import pytest as _pt
+from ltltwin.config import Config as _C
+
+
+@_pt.mark.parametrize("kw", [
+    dict(av_hours=(5, 5)), dict(av_hours=(-1, 21)), dict(av_hours=(5, 25)),
+    dict(pallets_per_shipment=(30, 30)), dict(pallets_per_shipment=(0, 6)), dict(pallets_per_shipment=(6, 1)),
+    dict(trailer_pallets=0), dict(av_fleet=-1), dict(tick_min=0), dict(tick_min=-15),
+    dict(human_mph=0), dict(av_mph=-1), dict(doors=0), dict(sla_hours=(28, 12)),
+    dict(shipments_per_day={"DAL": -1, "HOU": 90}), dict(days=2, warmup_days=2),
+])
+def test_bad_config_raises(kw):
+    with _pt.raises(ValueError, match="invalid Config"):
+        _C(**kw)
+
+
+def test_mutated_config_rechecked_by_twin():
+    from ltltwin.sim import Twin
+    from ltltwin.policies import HumanOnly
+    cfg = _C(); cfg.tick_min = 0
+    with _pt.raises(ValueError, match="tick_min"):
+        Twin(cfg, HumanOnly(), seed=0)
+
+
+def test_overnight_av_window_wraps_midnight():
+    from ltltwin.sim import Twin, local_hour
+    from ltltwin.policies import GreedyAVFirst
+    cfg = _C(days=4, warmup_days=1, av_hours=(21, 5))
+    assert cfg.av_window_open(22) and cfg.av_window_open(2) and not cfg.av_window_open(12) and not cfg.av_window_open(5)
+    tw = Twin(cfg, GreedyAVFirst(), seed=0).run()
+    av = [t for t in tw.trips if t.vehicle == "av"]
+    assert av, "overnight window must allow AV trips"
+    # the window gates the dispatch decision; Trip.depart is after door queue + loading (<= 26 x 2.5 min), so allow a lag
+    assert not [t for t in av if 8 <= local_hour(t.depart) < 20], "AV dispatched outside the overnight window"
+
+
+def test_day_window_unchanged_by_wraparound_support():
+    c = _C()   # (5, 21)
+    assert [h for h in range(24) if c.av_window_open(h)] == list(range(5, 21))
