@@ -167,38 +167,37 @@ What this means:
 
 All 5-seed estimates fall inside the corresponding final CI, and 10–13 seeds suffice for the running mean to settle within the 30-seed CI. Every estimate's sign agrees with its final value by n = 5. CP-SAT has only 10 seeds; its 5-seed values are within its own 10-seed CIs, but convergence beyond 10 is unverified.
 
-## Disruption case study (`experiments/disruptions.py`; balanced, 8 seeds, paired vs the same seed undisturbed)
+## Disruption case study (`experiments/disruptions.py`; balanced, 20 seeds, paired vs the same seed undisturbed)
 Day-7 events:
 - **weather:** AV hold 04:00–16:00;
 - **dock:** Dallas loses 4 of 6 doors 15:00–23:00;
 - **surge:** 50% of day-7 pickups slip 2–6 h;
 - **combined:** all three.
 
-Metrics cover freight created on days 7–8.
+Metrics cover freight created on days 7–8. Undisturbed window on-time: human_only 0.924, greedy 0.916, cpsat 0.900 (each ± 0.007).
 
 | Case | Policy | Window on-time | Δ vs undisturbed (pp) | Peak excess backlog (pallets) | Excess pallet-hours |
 |---|---|---|---|---|---|
-| weather | human_only | 0.930 | 0.00 (no AV) | 0 | 0 |
-| weather | greedy_av_first | 0.914 | −0.30 ± 0.65 | 53 ± 10 | 292 ± 63 |
-| weather | cpsat | 0.917 | +1.25 ± 0.89 | 38 ± 15 | 448 ± 186 |
-| dock | human_only | 0.930 | −0.03 ± 0.08 | 35 ± 7 | 55 ± 15 |
-| dock | greedy_av_first | 0.917 | −0.00 ± 0.27 | 50 ± 14 | 120 ± 45 |
-| dock | cpsat | 0.904 | −0.10 ± 0.29 | 44 ± 16 | 262 ± 190 |
-| surge | human_only | 0.900 | −3.02 ± 1.66 | 50 ± 3 | 602 ± 74 |
-| surge | greedy_av_first | 0.895 | −2.14 ± 1.74 | 68 ± 12 | 782 ± 190 |
-| surge | cpsat | 0.882 | −2.27 ± 2.33 | 87 ± 14 | 1109 ± 468 |
-| combined | human_only | 0.899 | −3.12 ± 1.65 | 52 ± 6 | 592 ± 70 |
-| combined | greedy_av_first | 0.890 | −2.66 ± 1.56 | 77 ± 13 | 876 ± 182 |
-| combined | cpsat | 0.884 | −2.02 ± 2.00 | 94 ± 12 | 1097 ± 395 |
+| weather | human_only | 0.924 | 0.00 (no AV) | 0 | 0 |
+| weather | greedy_av_first | 0.915 | −0.06 ± 0.35 | 50 ± 5 | 251 ± 40 |
+| weather | cpsat | 0.913 | +1.22 ± 0.41 | 35 ± 8 | 375 ± 103 |
+| dock | human_only | 0.924 | −0.02 ± 0.04 | 34 ± 3 | 54 ± 6 |
+| dock | greedy_av_first | 0.915 | −0.02 ± 0.10 | 49 ± 9 | 113 ± 30 |
+| dock | cpsat | 0.901 | +0.11 ± 0.24 | 46 ± 7 | 248 ± 94 |
+| surge | human_only | 0.908 | −1.63 ± 0.97 | 48 ± 2 | 597 ± 34 |
+| surge | greedy_av_first | 0.905 | −1.04 ± 0.90 | 69 ± 4 | 854 ± 83 |
+| surge | cpsat | 0.888 | −1.22 ± 1.06 | 86 ± 11 | 1170 ± 251 |
+| combined | human_only | 0.907 | −1.75 ± 1.00 | 51 ± 4 | 593 ± 33 |
+| combined | greedy_av_first | 0.898 | −1.74 ± 0.87 | 75 ± 5 | 926 ± 106 |
+| combined | cpsat | 0.893 | −0.77 ± 1.11 | 90 ± 11 | 1149 ± 244 |
 
 ![Backlog around the disruptions](results/disruption_backlog.png)
 
 Narrative:
 - **The plot shows each policy's operating style.** CP-SAT runs a large standing backlog every day (peaks of 150–230 pallets vs about 30–50 for human-only). This is the consolidation strategy that drives both its cost advantage and its extra dwell; disruptions are small on top of it.
-- **A 12 h AV weather hold barely hurts service under either AV policy.** Human trucks absorb the freight. Under CP-SAT, window on-time even rises (+1.25 ± 0.89 pp, a CI that only just excludes zero) because frozen AV slots force earlier human departures. The cost is a backlog that peaks at 40–50 pallets.
-- **A dock outage at the inbound peak is close to free for on-time** for every policy (|Δ| ≤ 0.1 pp), but it adds backlog.
-- **The late-pickup surge dominates.** It costs 2–3 pp on-time for every policy, and the CIs overlap, so no policy is clearly more resilient on service. CP-SAT carries the largest excess backlog (about 1,100 pallet-hours vs about 600 for human-only), because it was already holding freight to consolidate. A consolidation-heavy optimizer has less slack to absorb surges.
-- With 8 seeds, the disruption Δ CIs are wide (±1–2 pp). More seeds are on the to-do list.
+- **A 12 h AV weather hold doesn't hurt service.** Human trucks absorb the freight. Under CP-SAT, window on-time even rises, by +1.22 ± 0.41 pp. With 20 seeds the CI clearly excludes zero, where at 8 seeds it was borderline. The frozen AV slots force earlier human departures, i.e. the effect is CP-SAT's normal holding being suspended. The cost is a backlog that peaks at 35–50 pallets.
+- **A dock outage at the inbound peak is close to free for on-time** for every policy (|Δ| ≤ 0.11 pp), but it adds backlog: 2× human-only's pallet-hours for greedy, about 4.6× for CP-SAT.
+- **The late-pickup surge dominates**, at about 1–2 pp on-time for every policy. With 20 seeds the CIs are about ±1 pp and still overlap, so **no policy is clearly more resilient on service**. The 8-seed estimates (−2 to −3 pp) were biased toward larger losses by a few bad seeds. CP-SAT carries roughly twice human-only's excess backlog (about 1,150 vs 600 pallet-hours), because it was already holding freight to consolidate. A consolidation-heavy optimizer has less slack to absorb surges.
 
 ## Reproduce
 ```bash

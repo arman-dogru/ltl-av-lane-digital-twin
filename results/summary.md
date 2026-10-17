@@ -101,18 +101,18 @@ Paired difference vs greedy_av_first (imbalanced)
 
 | case | policy | seeds | window on-time | Δ vs undisturbed (pp) | peak excess backlog (pallets) | excess pallet-hours |
 |---|---|---|---|---|---|---|
-| none | human_only | 8 | 0.930 ± 0.006 | — | — | — |
-| none | greedy_av_first | 8 | 0.917 ± 0.009 | — | — | — |
-| none | cpsat | 8 | 0.905 ± 0.013 | — | — | — |
-| weather | human_only | 8 | 0.930 ± 0.006 | 0.00 ± 0.00 | 0 ± 0 | 0 ± 0 |
-| weather | greedy_av_first | 8 | 0.914 ± 0.010 | -0.30 ± 0.65 | 53 ± 10 | 292 ± 63 |
-| weather | cpsat | 8 | 0.917 ± 0.010 | 1.25 ± 0.89 | 38 ± 15 | 448 ± 186 |
-| dock | human_only | 8 | 0.930 ± 0.006 | -0.03 ± 0.08 | 35 ± 7 | 55 ± 15 |
-| dock | greedy_av_first | 8 | 0.917 ± 0.009 | -0.00 ± 0.27 | 50 ± 14 | 120 ± 45 |
-| dock | cpsat | 8 | 0.904 ± 0.013 | -0.10 ± 0.29 | 44 ± 16 | 262 ± 190 |
-| surge | human_only | 8 | 0.900 ± 0.013 | -3.02 ± 1.66 | 50 ± 3 | 602 ± 74 |
-| surge | greedy_av_first | 8 | 0.895 ± 0.014 | -2.14 ± 1.74 | 68 ± 12 | 782 ± 190 |
-| surge | cpsat | 8 | 0.882 ± 0.016 | -2.27 ± 2.33 | 87 ± 14 | 1109 ± 468 |
-| combined | human_only | 8 | 0.899 ± 0.013 | -3.12 ± 1.65 | 52 ± 6 | 592 ± 70 |
-| combined | greedy_av_first | 8 | 0.890 ± 0.011 | -2.66 ± 1.56 | 77 ± 13 | 876 ± 182 |
-| combined | cpsat | 8 | 0.884 ± 0.014 | -2.02 ± 2.00 | 94 ± 12 | 1097 ± 395 |
+| none | human_only | 20 | 0.924 ± 0.007 | — | — | — |
+| none | greedy_av_first | 20 | 0.916 ± 0.006 | — | — | — |
+| none | cpsat | 20 | 0.900 ± 0.007 | — | — | — |
+| weather | human_only | 20 | 0.924 ± 0.007 | 0.00 ± 0.00 | 0 ± 0 | 0 ± 0 |
+| weather | greedy_av_first | 20 | 0.915 ± 0.006 | -0.06 ± 0.35 | 50 ± 5 | 251 ± 40 |
+| weather | cpsat | 20 | 0.913 ± 0.007 | 1.22 ± 0.41 | 35 ± 8 | 375 ± 103 |
+| dock | human_only | 20 | 0.924 ± 0.007 | -0.02 ± 0.04 | 34 ± 3 | 54 ± 6 |
+| dock | greedy_av_first | 20 | 0.915 ± 0.006 | -0.02 ± 0.10 | 49 ± 9 | 113 ± 30 |
+| dock | cpsat | 20 | 0.901 ± 0.007 | 0.11 ± 0.24 | 46 ± 7 | 248 ± 94 |
+| surge | human_only | 20 | 0.908 ± 0.007 | -1.63 ± 0.97 | 48 ± 2 | 597 ± 34 |
+| surge | greedy_av_first | 20 | 0.905 ± 0.007 | -1.04 ± 0.90 | 69 ± 4 | 854 ± 83 |
+| surge | cpsat | 20 | 0.888 ± 0.007 | -1.22 ± 1.06 | 86 ± 11 | 1170 ± 251 |
+| combined | human_only | 20 | 0.907 ± 0.007 | -1.75 ± 1.00 | 51 ± 4 | 593 ± 33 |
+| combined | greedy_av_first | 20 | 0.898 ± 0.007 | -1.74 ± 0.87 | 75 ± 5 | 926 ± 106 |
+| combined | cpsat | 20 | 0.893 ± 0.008 | -0.77 ± 1.11 | 90 ± 11 | 1149 ± 244 |
