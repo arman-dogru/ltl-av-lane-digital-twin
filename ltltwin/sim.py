@@ -36,6 +36,9 @@ def local_hour(t: float) -> float: return (t % DAY) / HOUR
 class Twin:
     def __init__(self, cfg: Config, policy, seed: int = 0):
         self.cfg, self.policy, self.rng = cfg, policy, np.random.default_rng(seed)
+        worst = cfg.transit_min(av=False, to_endpoint=True) / 60.0
+        if worst > cfg.human_driver_hours:   # model assumes a one-way linehaul fits in one HOS drive window (no relays)
+            raise ValueError(f"human transit {worst:.1f} h exceeds human_driver_hours={cfg.human_driver_hours}")
         self.env = simpy.Environment()
         self.doors = {t: simpy.PriorityResource(self.env, capacity=cfg.doors) for t in cfg.terminals}
         self.pool = {t: [] for t in cfg.terminals}

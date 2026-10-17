@@ -14,6 +14,32 @@ This is a SimPy discrete-event model of an LTL network around one autonomous lin
 - `ltltwin/kpi.py`: on-time %, dwell, trailer fill, AV utilization and share, cost per pallet (with and without late penalty).
 - `tests/`: conservation, trailer capacity, AV operating window and weather hold, determinism, and that AV fleet = 0 reduces to human-only.
 
+## Assumptions (all in `ltltwin/config.py`; none are Waabi, Volvo or Warp figures)
+| Area | Parameter | Default | Basis / note | Swept? |
+|---|---|---|---|---|
+| Network | terminals / 3P endpoints | DAL, HOU; 2 endpoints per metro | Simplified hub pair plus customer docks | — |
+| | lane distance | 240 mi (+20 mi to an endpoint) | I-45 Dallas–Houston, approximate | — |
+| | speed (human / AV) | 58 / 55 mph door-to-door | AV assumed to run a slightly more conservative speed policy | — |
+| | human driver limit | 11 h | US HOS drive limit; the model checks that a one-way run fits (no relays) | — |
+| Docks | doors per terminal | 6 | Linehaul-usable doors | dock outage |
+| | load / unload | 2.5 / 2.0 min per pallet | Typical forklift rates | — |
+| Equipment | trailer | 26 pallet positions | 53' dry van, single-stacked | — |
+| | AV fleet | 2 tractors | Early-operations scale | 0–6 |
+| | AV departure window | 05:00–21:00 | Assumed operating design domain; observer on board | 12 h, 24 h |
+| | AV direct-to-3P | allowed | Mirrors "direct to third-party facilities" in the Oct 2026 release | ablation |
+| Cost | human linehaul | $2.30/mi + $150 per dispatch | Plausible US truckload driver and equipment cost plus a call-out minimum | — |
+| | AV linehaul | $1.60/mi | Includes amortized observer and remote-ops overhead; the most uncertain number here | 1.2–2.3 |
+| | late penalty (reporting) | $75 per late shipment | Service-failure charge, used only in "cost+late" | — |
+| | CP-SAT objective | late $300 + $50/h; holding $0.50 per pallet-h; buffer 30 min | Optimizer weights, not costs | floor, buffer, late weight |
+| Demand | volume | 200 shipments/day (balanced 100/100; imbalanced 140/60) | Synthetic; about 700 pallets/day | ±30% |
+| | size | 1–6 pallets, uniform | LTL range | — |
+| | ready-time profile | afternoon/evening peak after P&D sweeps | Hourly weights in config | — |
+| | consignee | 35% to a 3P endpoint, else terminal | Assumption | — |
+| | deadline | ready + U[12, 28] h | Calibrated so human-only is about 92.5% on-time (seeds 1000–1004) | calibration sweep |
+| Baselines | human sweep departures | 22:00 and 02:00 | Night linehaul pattern | — |
+| Sim | horizon / warm-up | 14 days (+3 drain) / 2 days | KPIs cover freight created on days 2–14 | — |
+| | decision tick | 15 min (CP-SAT re-plans every 60 min) | | re-plan 30/120 min |
+
 ## Calibration
 The deadline window was swept for the human-only baseline (5 seeds per point, seeds 1000–1004, disjoint from the evaluation seeds 0–29; `experiments/calibrate.py` → `results/calibration_sla.json`). A window of `ready + U[12, 28] h` puts human-only at about 92.5% on-time, which leaves room for policies to differ. Windows of 18–30 h (the original default) gave 98.5%, and 8–20 h gave 79.8%.
 

@@ -66,3 +66,11 @@ def test_zero_demand_cpsat():
     from ltltwin.optimizer import CPSATDispatcher
     k = kpis(Twin(small(shipments_per_day={"DAL": 0, "HOU": 0}), CPSATDispatcher(time_limit_s=0.2), seed=0).run())
     assert k["shipments"] == 0 and math.isnan(k["on_time"])
+
+def test_hos_limit_is_validated():
+    with pytest.raises(ValueError):
+        Twin(small(lane_miles=900.0), HumanOnly(), seed=0)
+
+def test_sweep_hours_come_from_config():
+    a = kpis(Twin(small(human_sweep_hours=(22, 2)), HumanOnly(), seed=4).run()); b = kpis(Twin(small(human_sweep_hours=(20,)), HumanOnly(), seed=4).run())
+    assert a != b
