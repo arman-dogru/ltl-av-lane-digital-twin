@@ -202,7 +202,26 @@ Narrative:
 ## Reproduce
 ```bash
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt   # pinned
-.venv/bin/python -m pytest -q tests                            # 20 tests
+.venv/bin/python -m pytest -q tests                            # 26 tests
 WORKERS=4 ./run_all.sh                                        # resumable grids -> results/grid_*.csv
+./run_followup.sh                                             # review10 + sweeps grids, 20-seed disruptions (log: results/followup.log)
 .venv/bin/python experiments/summarize.py                     # -> results/summary.md
+.venv/bin/python experiments/summarize_sweeps.py              # -> results/sweeps.md
+.venv/bin/python experiments/seed_stability.py                # -> results/seed_stability.md/.png
 ```
+CP-SAT runs with a 1 s time limit, so reruns can differ in the last digits. The grid runner reuses cached cells, so the committed CSVs are what the README reports.
+
+## Limitations
+- Every number is synthetic, from `ltltwin/config.py`. The ranking of policies is the result; the dollar levels are not forecasts.
+- AV cost is per-mile only, with no fixed per-trip cost (remote ops, inspections, terminal handoff). This flatters the AV, as shown by the $2.30/mi sweep.
+- The defer floor is a heuristic continuation value (see the `av_share` note above). The dwell/on-time trade depends on it, non-monotonically.
+- One lane, two terminals, fixed AV operating window, no driver-pool constraint beyond HOS, deterministic travel times outside the disruption events.
+- Sweeps and ablations use 5 seeds. The main CP-SAT comparisons use 10; greedy and human baselines use 30.
+- The counterintuitive 24 h-vs-16 h AV-hours result is unexplained.
+
+## Next steps
+1. Add a fixed per-trip AV cost and re-sweep the AV cost per mile.
+2. Look at traces for the 24 h AV window, and run 10 seeds on the hours sweep.
+3. Learn the defer continuation value from simulation (e.g. fitted backlog value) instead of the heuristic floor.
+4. Try a surge-aware CP-SAT variant (lower holding when the late-pickup rate spikes) to target the backlog weakness found in the disruption study.
+5. Extend to a multi-lane network with AV repositioning between lanes.
