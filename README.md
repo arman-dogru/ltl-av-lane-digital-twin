@@ -4,6 +4,58 @@
 
 This is a SimPy discrete-event model of an LTL network around one autonomous linehaul lane (Dallas ↔ Houston terminals plus 3P endpoints). It is used to compare policies for deciding which consolidated freight rides an AV truck and which rides a human-driven one. All parameters are explicit assumptions in `ltltwin/config.py`, not Waabi, Volvo or Warp figures. The context is the [Volvo × Waabi customer operations with Warp on Dallas–Houston](https://waabi.ai/insights/volvo-and-waabi-kick-off-customer-operations-in-texas-starting-with-warp) (Oct 5, 2026).
 
+## At a glance
+| | |
+|---|---|
+| **What** | SimPy discrete-event twin of one autonomous LTL linehaul lane (Dallas ↔ Houston + 3P endpoints), comparing human-only, fixed-headway AV, greedy AV-first and a CP-SAT rolling-horizon dispatcher |
+| **Headline** | CP-SAT with 2 AVs: **−$8.81 ± 0.30 per pallet** vs human-only, at **−2.25 ± 0.28 pp on-time** and +2.97 h dwell (balanced, 10 paired seeds) |
+| **Why** | Same CP-SAT without AVs saves only $1.33 ± 0.34, so about 85% of the saving depends on AV capacity |
+| **Baseline** | Greedy AV-first: −$3.24 ± 0.12 per pallet, −0.68 ± 0.13 pp on-time (30 seeds) |
+| **Surprise** | Opening AVs to 24 h is **$0.71 ± 0.48 per pallet worse** than 05–21 (paired, 10 seeds): the window acts as an AV timetable the planner can't find itself |
+| **Robustness** | Still saves $7.25 per pallet at AV/human per-mile parity; defer-floor sweep moves cost by < $0.40 |
+| **Rigor** | Common random numbers, 95% t-CIs on paired per-seed differences, 45 tests (conservation, capacity, AV window, determinism, config validation) |
+
+All parameters are synthetic assumptions (table below); the policy ranking is the result, not the dollar levels.
+
+```mermaid
+flowchart TD
+    D["Demand: 200 shipments/day<br/>1-6 pallets, ready time + deadline"] --> IN["Origin dock<br/>6 doors, 2.5 min/pallet load"]
+    IN --> POOL["Freight pool at DAL / HOU"]
+    POOL --> POL[["Dispatch policy, every 15 min<br/>HumanOnly, AVFixed, GreedyAVFirst, or<br/>CP-SAT 8 h rolling horizon, re-plan 60 min"]]
+    POL -->|defer| POOL
+    POL -->|"AV slot, dispatch 05-21"| AV["AV linehaul<br/>2 tractors, $1.60/mi"]
+    POL -->|"hourly slot"| HU["Human linehaul<br/>$2.30/mi + $150/dispatch"]
+    AV --> DST["Destination dock or direct to 3P"]
+    HU --> DST
+    DST --> K["ltltwin/kpi.py: on-time, cost/pallet, dwell, fill"]
+    K --> G[("results/grid_*.csv<br/>30 / 10 / 5 paired seeds")]
+    G --> S["experiments/summarize*.py → tables"]
+    G --> F["scripts/make_figures.py → docs/figures"]
+```
+
+### What a simulated schedule looks like
+![Gantt chart of every linehaul trip in a 48-hour window, day 7 to day 9, of one balanced-demand run with seed 0. Top panel greedy AV-first: 10 loaded AV runs and 54 human runs. Bottom panel CP-SAT: 12 loaded AV runs and 44 human runs, with the two AV tractors shuttling full trailers between Dallas and Houston during the 05:00 to 21:00 dispatch window and fewer, fuller human trucks.](docs/figures/schedule_gantt.png)
+
+One simulated run (balanced demand, seed 0), read from `results/schedule_balanced_seed0.csv`, which `experiments/export_schedule.py` writes. The seed-0 KPIs from that export match the committed grid rows (greedy on-time 0.9163, $29.63 per pallet; CP-SAT 0.8995, $25.06). CP-SAT holds freight to send fewer, fuller human trucks, and both AV tractors run near-full trailers inside the dispatch window.
+
+### Results in four plots
+![Two scatter panels, balanced and imbalanced demand, of cost per pallet against on-time percentage for each policy with 95 percent confidence intervals. Human only sits near 33.8 dollars and 92.6 percent; greedy AV-first near 30.6 dollars and 91.9 percent; CP-SAT lowest at 24.91 dollars and 90.4 percent balanced and 25.38 dollars and 88.2 percent imbalanced; CP-SAT without AVs at 32.40 dollars and 93.2 percent.](docs/figures/cost_vs_ontime.png)
+
+**Cost vs service per policy.** CP-SAT is cheapest but loses some on-time. Without AVs, the same dispatcher lands next to human-only.
+
+<p>
+<img src="docs/figures/paired_seed_deltas.png" width="49%" alt="Strip plot of per-seed paired cost-per-pallet differences against human-only. Every seed is negative: greedy AV-first minus 3.24 dollars balanced and minus 2.58 imbalanced over 30 seeds, CP-SAT minus 8.81 balanced and minus 8.46 imbalanced over 10 seeds, and CP-SAT without AVs minus 1.33 over 10 seeds.">
+<img src="docs/figures/cpsat_ablations.png" width="49%" alt="Two bar panels of CP-SAT variants on balanced demand, paired against human-only. The cost saving stays between minus 8.05 and minus 9.04 dollars per pallet for every horizon, warm-start, direct-to-3P, repositioning and defer-floor variant, and falls to minus 1.33 dollars with no AVs. On-time losses range from minus 1.13 to minus 2.63 percentage points, while the no-AV control gains 0.62.">
+</p>
+
+**Left:** paired per-seed savings (one dot per seed, same demand for every policy). **Right:** CP-SAT ablations. Horizon, warm start and defer floor barely move the saving; removing the AVs removes most of it.
+
+![Three line panels from the balanced sensitivity sweeps over seeds 0 to 4. Left: the cost saving against human-only grows with AV fleet size, from 4.94 dollars at 1 AV to 12.85 at 6 AVs under CP-SAT, and from 1.80 to 4.84 under greedy. Middle: on-time change, falling to about minus 3 percentage points under CP-SAT with 4 to 6 AVs while greedy returns to zero. Right: the CP-SAT saving shrinks from 9.87 to 7.25 dollars as AV cost rises from 1.20 to 2.30 dollars per mile.](docs/figures/sensitivity_sweeps.png)
+
+**Sensitivity sweeps** (5 seeds each, paired vs human-only under the same setting). Each extra AV is worth less than the one before. CP-SAT still saves at per-mile parity because the AV has no per-dispatch fee in this model, which is the main open sensitivity.
+
+Figures are drawn by `scripts/make_figures.py` from the committed `results/grid_*.csv` and `results/schedule_balanced_seed0.csv`. It uses the same t-CI formula as `experiments/summarize.py`, so plotted values match the tables below.
+
 ## Layout
 - `ltltwin/config.py`: every assumption (network, docks, AV hours and fleet, costs, demand profile, SLAs, disruptions).
 - `ltltwin/sim.py`: shipments → inbound dock (door contention) → pool → linehaul (AV or human, direct-to-3P allowed) → destination dock or final mile.
@@ -180,6 +232,8 @@ The trace rerun (seeds 0, 1, 4) shows the mechanism:
 | cpsat Δ on-time pp, balanced | 10 | −2.25 ± 0.28 | −2.38 ± 0.43 | = final | 3 (of 10) |
 | cpsat Δ on-time pp, imbalanced | 10 | −3.69 ± 0.40 | −3.48 ± 0.77 | = final | 5 (of 10) |
 
+![Two line panels of the running mean of paired differences against human-only as seeds are added, with shaded 95 percent intervals. Left: cost per pallet, with greedy settling near minus 3.2 balanced and minus 2.6 imbalanced over 30 seeds and CP-SAT near minus 8.8 and minus 8.5 over 10 seeds. Right: on-time in percentage points, with greedy near minus 0.7 and minus 0.4 and CP-SAT near minus 2.2 and minus 3.7.](results/seed_stability.png)
+
 Every final mean lies inside its 5-seed CI. The converse fails for two balanced greedy rows: Δ cost −3.00 vs a final −3.24 ± 0.12, and Δ on-time −0.91 vs a final −0.68 ± 0.13 (both columns are computed in `results/seed_stability.md`). 10–13 seeds suffice for the running mean to settle within the 30-seed CI. Every estimate's sign agrees with its final value by n = 5. CP-SAT has only 10 seeds; its 5-seed values are within its own 10-seed CIs, but convergence beyond 10 is unverified.
 
 ## Disruption case study (`experiments/disruptions.py`; balanced, 20 seeds, paired vs the same seed undisturbed)
@@ -206,7 +260,7 @@ Metrics cover freight created on days 7–8. Undisturbed window on-time: human_o
 | combined | greedy_av_first | 0.898 | −1.74 ± 0.87 | 75 ± 5 | 926 ± 106 |
 | combined | cpsat | 0.893 | −0.77 ± 1.11 | 90 ± 11 | 1149 ± 244 |
 
-![Backlog around the disruptions](results/disruption_backlog.png)
+![Three line panels, one per policy, of mean pallets waiting at both terminals from day 6 to day 10 for the undisturbed run and the weather, dock, surge and combined day-7 disruptions. CP-SAT carries a standing daily backlog of roughly 150 to 230 pallets, against about 30 to 50 for human-only; the surge and combined cases add the most backlog on top.](results/disruption_backlog.png)
 
 Narrative:
 - **The plot shows each policy's operating style.** CP-SAT runs a large standing backlog every day (peaks of 150–230 pallets vs about 30–50 for human-only). This is the consolidation strategy that drives both its cost advantage and its extra dwell; disruptions are small on top of it.
@@ -224,6 +278,8 @@ WORKERS=4 ./run_all.sh                                        # resumable grids 
 .venv/bin/python experiments/summarize.py                     # -> results/summary.md
 .venv/bin/python experiments/summarize_sweeps.py              # -> results/sweeps.md
 .venv/bin/python experiments/seed_stability.py                # -> results/seed_stability.md/.png
+.venv/bin/python experiments/export_schedule.py               # -> results/schedule_balanced_seed0.csv (one traced run per policy, ~30 s)
+.venv/bin/python scripts/make_figures.py                      # -> docs/figures/*.png from the committed CSVs (seconds, no simulation)
 ```
 CP-SAT runs with a 1 s time limit, so reruns can differ in the last digits. The grid runner reuses cached cells, so the committed CSVs are what the README reports.
 
